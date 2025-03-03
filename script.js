@@ -75,25 +75,24 @@ document.addEventListener('DOMContentLoaded', function() {
   };
 
   // Handle room creation
-  const roomNameInput = document.getElementById('roomName'); // Ensure this is the correct input field
+  const roomNameInput = document.getElementById('roomName');
   const startBoardingButton = document.getElementById('startBoarding');
-
+  
   if (roomNameInput && startBoardingButton) {
     // Set placeholder with random name suggestion
     roomNameInput.placeholder = `e.g., ${generateRandomName()}`;
-
+    
     startBoardingButton.addEventListener('click', async () => {
-      let roomName = roomNameInput.value.trim(); // Get the input value and trim whitespace
-
+      let roomName = roomNameInput.value.trim();
+      
       // If no room name is provided, generate a random one
       if (!roomName) {
-        roomName = generateRandomName(); // Generate a random name if empty
+        roomName = roomNameInput.placeholder;
       }
-
+      
       const user = JSON.parse(localStorage.getItem('user') || '{}');
-
+      
       if (user && user.id) {
-        console.log("ROOM NAME = ", roomName); // Log the room name for debugging
         // Create board in database if logged in
         try {
           const response = await fetch('/api/boards', {
@@ -102,12 +101,13 @@ document.addEventListener('DOMContentLoaded', function() {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${localStorage.getItem('token')}`
             },
-            body: JSON.stringify({ name: roomName }) // Use the validated room name
+            body: JSON.stringify({ name: roomName })
           });
-
+          
           if (response.ok) {
             const data = await response.json();
-            window.location.href = `/board?room=${encodeURIComponent(data.board.roomId)}`; // Use roomId from the response
+            // Pass room name as a query parameter
+            window.location.href = `/board?room=${encodeURIComponent(data.board.id)}&name=${encodeURIComponent(roomName)}`;
           } else {
             alert('Failed to create board. Please try again.');
           }
@@ -118,12 +118,46 @@ document.addEventListener('DOMContentLoaded', function() {
       } else {
         // Just redirect to a new room if not logged in
         const roomId = Math.random().toString(36).substring(2, 15);
-        window.location.href = `/board?room=${encodeURIComponent(roomId)}`;
+        // Pass room name as a query parameter
+        window.location.href = `/board?room=${encodeURIComponent(roomId)}&name=${encodeURIComponent(roomName)}`;
       }
     });
   }
 
   // Handle login form submission
+  const loginForm = document.getElementById('loginForm');
+  if (loginForm) {
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      
+      try {
+        const response = await fetch('/api/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ email, password })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          window.location.href = '/';
+        } else {
+          alert(data.error || 'Login failed. Please check your credentials.');
+        }
+      } catch (error) {
+        console.error('Login error:', error);
+        alert('Login failed. Please try again.');
+      }
+    });
+  }
+
+  // Handle registration form submission
   const registerForm = document.getElementById('registerForm');
   if (registerForm) {
     registerForm.addEventListener('submit', async (e) => {

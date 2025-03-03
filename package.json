@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Collaborative whiteboard application",
   "scripts": {
-    "start": "nodemon server.js",
+    "start": "node server.js",
     "dev": "nodemon server.js",
     "build": "mkdir -p dist && cp -r *.html *.css *.js dist/"
   },
@@ -20,6 +20,6 @@
     "uuid": "^9.0.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.9"
+    "nodemon": "^3.0.1"
   }
 }

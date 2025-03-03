@@ -6,10 +6,11 @@ document.addEventListener('DOMContentLoaded', function() {
   // Get URL parameters
   const urlParams = new URLSearchParams(window.location.search);
   const roomId = urlParams.get('room') || 'Untitled Board';
+  const roomName = urlParams.get('name') || 'Untitled Board';
   
   // Set room name in the UI
-  document.getElementById('roomName').textContent = roomId;
-  document.title = `${roomId} - Collaboard`;
+  document.getElementById('roomName').textContent = roomName;
+  document.title = `${roomName} - Collaboard`;
   
   // Canvas setup
   const canvas = document.getElementById('whiteboard');
@@ -462,7 +463,7 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('saveBtn').addEventListener('click', () => {
     // Create a temporary link element
     const link = document.createElement('a');
-    link.download = `${roomId}.png`;
+    link.download = `${roomName}.png`;
     link.href = canvas.toDataURL('image/png');
     
     // Trigger download
@@ -689,23 +690,5 @@ document.addEventListener('DOMContentLoaded', function() {
     if (userItem) {
       userItem.remove();
     }
-  }
-
-  function createRoom() {
-    const roomNameInput = document.getElementById('roomNameInput'); // Assuming this is the input field for the room name
-    let roomName = roomNameInput.value.trim(); // Get the input value and trim whitespace
-
-    if (!roomName) { // Check if the room name is empty
-        roomName = generateRandomRoomName(); // Generate a random name if empty
-    }
-
-    // Proceed to create the room with the validated room name
-    createRoomInDatabase(roomName); // Assuming this function handles the room creation logic
-  }
-
-  // Function to generate a random room name
-  function generateRandomRoomName() {
-    const randomName = 'Room_' + Math.floor(Math.random() * 10000); // Example random name generation
-    return randomName;
   }
 });
