@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Whiteboard - Collaboard</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="board.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="module" src="board.js"></script>
+  </head>
+  <body class="board-page">
+    <header class="board-header">
+      <div class="board-nav">
+        <div class="logo">
+          <i class="fas fa-pencil-alt"></i>
+          <a href="/">Collaboard</a>
+        </div>
+        <div class="room-info">
+          <h2 id="roomName">Loading...</h2>
+          <div class="room-status">
+            <span id="connectionStatus"><i class="fas fa-circle-notch fa-spin"></i> Connecting...</span>
+            <span id="usersCount">1 user</span>
+          </div>
+        </div>
+        <div class="board-actions">
+          <button class="btn btn-outline" id="shareBtn">
+            <i class="fas fa-share-alt"></i> Share
+          </button>
+          <button class="btn btn-outline" id="saveBtn">
+            <i class="fas fa-save"></i> Save
+          </button>
+          <a href="/" class="btn btn-outline">
+            <i class="fas fa-times"></i> Exit
+          </a>
+        </div>
+      </div>
+      <div class="toolbar">
+        <div class="tool-group">
+          <button class="tool-btn active" data-tool="brush" title="Brush">
+            <i class="fas fa-paint-brush"></i>
+          </button>
+          <button class="tool-btn" data-tool="line" title="Line">
+            <i class="fas fa-slash"></i>
+          </button>
+          <button class="tool-btn" data-tool="rectangle" title="Rectangle">
+            <i class="far fa-square"></i>
+          </button>
+          <button class="tool-btn" data-tool="circle" title="Circle">
+            <i class="far fa-circle"></i>
+          </button>
+          <button class="tool-btn" data-tool="text" title="Text">
+            <i class="fas fa-font"></i>
+          </button>
+        </div>
+        <div class="tool-group">
+          <input type="color" id="colorPicker" value="#000000" title="Color">
+          <div class="stroke-width">
+            <button class="stroke-btn" data-width="2">S</button>
+            <button class="stroke-btn active" data-width="5">M</button>
+            <button class="stroke-btn" data-width="10">L</button>
+          </div>
+        </div>
+        <div class="tool-group">
+          <button class="tool-btn" id="undoBtn" title="Undo">
+            <i class="fas fa-undo"></i>
+          </button>
+          <button class="tool-btn" id="redoBtn" title="Redo">
+            <i class="fas fa-redo"></i>
+          </button>
+          <button class="tool-btn" id="clearBtn" title="Clear All">
+            <i class="fas fa-trash"></i>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="board-container">
+      <canvas id="whiteboard"></canvas>
+    </main>
+
+    <div class="modal" id="shareModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Share this board</h3>
+          <button class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p>Share this link with others to collaborate:</p>
+          <div class="share-link">
+            <input type="text" id="shareLink" readonly>
+            <button class="btn btn-primary" id="copyLinkBtn">
+              <i class="fas fa-copy"></i> Copy
+            </button>
+          </div>
+          <div class="share-options">
+            <div class="option">
+              <input type="checkbox" id="enablePassword">
+              <label for="enablePassword">Protect with password</label>
+            </div>
+            <div class="password-input" style="display: none;">
+              <input type="password" id="boardPassword" placeholder="Enter password">
+              <button class="btn btn-primary" id="setPasswordBtn">Set Password</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="users-panel" id="usersPanel">
+      <div class="panel-header">
+        <h3>Connected Users</h3>
+      </div>
+      <div class="users-list" id="usersList">
+        <!-- Users will be added dynamically -->
+      </div>
+    </div>
+
+    <div class="toast" id="toast">
+      <div class="toast-content">
+        <i class="fas fa-info-circle"></i>
+        <span id="toastMessage"></span>
+      </div>
+    </div>
+  </body>
+</html>
