@@ -173,6 +173,7 @@ app.post("/api/boards", authenticateToken, async (req, res) => {
 		res.status(201).json({
 			message: "Board created successfully",
 			board,
+			roomId,
 		});
 	} catch (error) {
 		console.error("Board creation error:", error);

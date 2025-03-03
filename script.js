@@ -106,8 +106,8 @@ document.addEventListener('DOMContentLoaded', function() {
           
           if (response.ok) {
             const data = await response.json();
-            // Pass room name as a query parameter
-            window.location.href = `/board?room=${encodeURIComponent(data.board.id)}&name=${encodeURIComponent(roomName)}`;
+            // Pass room ID as a query parameter
+            window.location.href = `/board?room=${encodeURIComponent(data.roomId)}&name=${encodeURIComponent(roomName)}`;
           } else {
             alert('Failed to create board. Please try again.');
           }
