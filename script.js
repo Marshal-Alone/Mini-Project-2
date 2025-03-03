@@ -79,15 +79,31 @@ document.addEventListener('DOMContentLoaded', function() {
   const startBoardingButton = document.getElementById('startBoarding');
   
   if (roomNameInput && startBoardingButton) {
-    // Set placeholder with random name suggestion
-    roomNameInput.placeholder = `e.g., ${generateRandomName()}`;
+    // Set initial placeholder
+    roomNameInput.placeholder = "Enter your room name...";
+
+    // Change placeholder to random name after 3 seconds
+    setTimeout(() => {
+      const updatePlaceholder = () => {
+        roomNameInput.placeholder = `e.g. ${generateRandomName()}`;
+      };
+
+      updatePlaceholder(); // Initial update
+      const intervalId = setInterval(updatePlaceholder, 3000); // Update every 3 seconds
+
+      // Clear interval when the user starts typing
+      roomNameInput.addEventListener('input', () => {
+        clearInterval(intervalId);
+        roomNameInput.placeholder = ""; // Clear placeholder when typing
+      });
+    }, 3000); // Start changing after 3 seconds
     
     startBoardingButton.addEventListener('click', async () => {
       let roomName = roomNameInput.value.trim();
       
       // If no room name is provided, generate a random one
       if (!roomName) {
-        roomName = roomNameInput.placeholder;
+        roomName = roomNameInput.placeholder.replace("e.g. ", ""); // Get the random name
       }
       
       const user = JSON.parse(localStorage.getItem('user') || '{}');

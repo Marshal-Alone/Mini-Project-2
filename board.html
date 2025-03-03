@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <title>Whiteboard - Collaboard</title>
+    <title id="pageTitle">Loading...</title>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="styles.css" />
@@ -38,6 +38,9 @@
       </div>
       <div class="toolbar">
         <div class="tool-group">
+          <button class="tool-btn" id="eraserBtn" data-tool="eraser" title="Eraser">
+            <i class="fas fa-eraser"></i>
+          </button>
           <button class="tool-btn active" data-tool="brush" title="Brush">
             <i class="fas fa-paint-brush"></i>
           </button>
@@ -55,12 +58,21 @@
           </button>
         </div>
         <div class="tool-group">
+          <label for="brushSize">Brush Size:</label>
+          <select id="brushSize">
+            <option value="2">Small</option>
+            <option value="5" selected>Medium</option>
+            <option value="10">Large</option>
+          </select>
           <input type="color" id="colorPicker" value="#000000" title="Color">
-          <div class="stroke-width">
-            <button class="stroke-btn" data-width="2">S</button>
-            <button class="stroke-btn active" data-width="5">M</button>
-            <button class="stroke-btn" data-width="10">L</button>
-          </div>
+        </div>
+        <div class="tool-group" id="eraserSettings" style="display: none;">
+          <label for="eraserSize">Eraser Size:</label>
+          <select id="eraserSize">
+            <option value="5">Small</option>
+            <option value="10" selected>Medium</option>
+            <option value="15">Large</option>
+          </select>
         </div>
         <div class="tool-group">
           <button class="tool-btn" id="undoBtn" title="Undo">
@@ -122,6 +134,18 @@
         <i class="fas fa-info-circle"></i>
         <span id="toastMessage"></span>
       </div>
+    </div>
+
+    <div id="brushSettings" class="brush-settings" style="display: none;">
+      <h3>Brush Settings</h3>
+      <label for="brushColor">Brush Color:</label>
+      <input type="color" id="brushColor" value="#000000">
+      
+      <label for="brushSizeSlider">Brush Size:</label>
+      <input type="range" id="brushSizeSlider" min="1" max="100" value="5">
+      
+      <label for="brushOpacity">Opacity:</label>
+      <input type="range" id="brushOpacity" min="0" max="100" value="100">
     </div>
   </body>
 </html>

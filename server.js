@@ -246,16 +246,9 @@ io.on("connection", (socket) => {
 	});
 
 	// Handle drawing events
-	socket.on("drawEvent", async (data) => {
-		const roomId = socket.roomId;
-
-		if (roomId && rooms[roomId]) {
-			// Add to history
-			rooms[roomId].history.push(data);
-
-			// Broadcast to all other users in the room
-			socket.to(roomId).emit("drawEvent", data);
-		}
+	socket.on("drawEvent", (data) => {
+		// Broadcast the drawing or erasing event to all other users in the room
+		socket.to(socket.roomId).emit("drawEvent", data);
 	});
 
 	// Handle clear canvas event

@@ -10,6 +10,8 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Set room name in the UI
   document.getElementById('roomName').textContent = roomName;
+  
+  // Set the title of the page
   document.title = `${roomName} - Collaboard`;
   
   // Canvas setup
@@ -22,7 +24,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Drawing settings
   let currentTool = 'brush';
   let currentColor = '#000000';
-  let currentWidth = 5;
+  let currentWidth = 5; // Default brush size
   
   // History for undo/redo
   const history = [];
@@ -69,6 +71,12 @@ document.addEventListener('DOMContentLoaded', function() {
   // Save initial blank state
   saveState();
   
+  // Add event listener for brush size selection
+  const brushSizeSelect = document.getElementById('brushSize');
+  brushSizeSelect.addEventListener('change', (e) => {
+    currentWidth = parseInt(e.target.value);
+  });
+  
   // Drawing functions
   function startDrawing(e) {
     isDrawing = true;
@@ -79,7 +87,7 @@ document.addEventListener('DOMContentLoaded', function() {
     lastY = e.clientY - rect.top;
     
     // For shapes, we'll start a new path
-    if (currentTool !== 'brush') {
+    if (currentTool !== 'brush' && currentTool !== 'pencil') {
       ctx.beginPath();
       ctx.moveTo(lastX, lastY);
     }
@@ -94,14 +102,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentY = e.clientY - rect.top;
     
     // Set drawing styles
-    ctx.strokeStyle = currentColor;
-    ctx.lineWidth = currentWidth;
+    ctx.lineWidth = currentWidth; // Use the selected brush size
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     
     // Draw based on selected tool
     switch (currentTool) {
       case 'brush':
+        ctx.strokeStyle = currentColor;
+        ctx.globalAlpha = brushOpacitySlider.value / 100; // Use the selected opacity
         ctx.beginPath();
         ctx.moveTo(lastX, lastY);
         ctx.lineTo(currentX, currentY);
@@ -115,18 +124,32 @@ document.addEventListener('DOMContentLoaded', function() {
           endX: currentX,
           endY: currentY,
           color: currentColor,
-          width: currentWidth
+          width: currentWidth,
+          opacity: ctx.globalAlpha // Send opacity
+        });
+        break;
+        
+      case 'eraser':
+        // Set composite operation to destination-out for erasing
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.beginPath();
+        ctx.arc(currentX, currentY, parseInt(eraserSizeSelect.value) / 2, 0, Math.PI * 2, false);
+        ctx.fill();
+        
+        // Emit erase event to server
+        socket.emit('drawEvent', {
+          tool: 'eraser',
+          startX: currentX,
+          startY: currentY,
+          width: parseInt(eraserSizeSelect.value) // Send eraser size
         });
         break;
         
       case 'line':
-        // Clear canvas and redraw from history
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (historyIndex >= 0) {
           ctx.drawImage(history[historyIndex], 0, 0);
         }
-        
-        // Draw the line
         ctx.beginPath();
         ctx.moveTo(lastX, lastY);
         ctx.lineTo(currentX, currentY);
@@ -134,40 +157,41 @@ document.addEventListener('DOMContentLoaded', function() {
         break;
         
       case 'rectangle':
-        // Clear canvas and redraw from history
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (historyIndex >= 0) {
           ctx.drawImage(history[historyIndex], 0, 0);
         }
-        
-        // Draw the rectangle
+        ctx.beginPath();
         const width = currentX - lastX;
         const height = currentY - lastY;
-        ctx.beginPath();
         ctx.rect(lastX, lastY, width, height);
         ctx.stroke();
         break;
         
       case 'circle':
-        // Clear canvas and redraw from history
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (historyIndex >= 0) {
           ctx.drawImage(history[historyIndex], 0, 0);
         }
-        
-        // Draw the circle
-        const radius = Math.sqrt(Math.pow(currentX - lastX, 2) + Math.pow(currentY - lastY, 2));
         ctx.beginPath();
+        const radius = Math.sqrt(Math.pow(currentX - lastX, 2) + Math.pow(currentY - lastY, 2));
         ctx.arc(lastX, lastY, radius, 0, Math.PI * 2);
         ctx.stroke();
         break;
+        
+      case 'text':
+        // Handle text drawing logic here
+        break;
     }
     
-    // Update last position for brush tool
-    if (currentTool === 'brush') {
+    // Update last position for brush and eraser tools
+    if (currentTool === 'brush' || currentTool === 'eraser') {
       lastX = currentX;
       lastY = currentY;
     }
+    
+    // After drawing or erasing
+    ctx.globalCompositeOperation = 'source-over'; // Reset to default
   }
   
   function stopDrawing(event) {
@@ -180,7 +204,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentY = event.clientY - rect.top;
     
     // Emit shape drawing events
-    if (currentTool !== 'brush') {
+    if (currentTool !== 'brush' && currentTool !== 'pencil') {
       switch (currentTool) {
         case 'line':
           socket.emit('drawEvent', {
@@ -248,17 +272,24 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Handle received drawing events
   socket.on('drawEvent', (data) => {
-    ctx.strokeStyle = data.color;
-    ctx.lineWidth = data.width || data.lineWidth;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    
+    ctx.lineWidth = data.width; // Set line width
+
     switch (data.tool) {
       case 'brush':
+        ctx.strokeStyle = data.color;
+        ctx.globalAlpha = data.opacity; // Set opacity from the event
         ctx.beginPath();
         ctx.moveTo(data.startX, data.startY);
         ctx.lineTo(data.endX, data.endY);
         ctx.stroke();
+        break;
+        
+      case 'eraser':
+        // Set composite operation to destination-out for erasing
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.beginPath();
+        ctx.arc(data.startX, data.startY, data.width / 2, 0, Math.PI * 2, false);
+        ctx.fill();
         break;
         
       case 'line':
@@ -333,6 +364,13 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Tool selection
   const toolButtons = document.querySelectorAll('.tool-btn[data-tool]');
+  const brushSettingsPopup = document.getElementById('brushSettings');
+  const brushColorInput = document.getElementById('brushColor');
+  const brushSizeSlider = document.getElementById('brushSizeSlider');
+  const brushOpacitySlider = document.getElementById('brushOpacity');
+  const eraserSettings = document.getElementById('eraserSettings');
+  const eraserSizeSelect = document.getElementById('eraserSize');
+  
   toolButtons.forEach(button => {
     button.addEventListener('click', () => {
       // Remove active class from all tool buttons
@@ -343,6 +381,22 @@ document.addEventListener('DOMContentLoaded', function() {
       
       // Set current tool
       currentTool = button.dataset.tool;
+
+      // Show brush settings if brush tool is selected
+      if (currentTool === 'brush') {
+        brushSettingsPopup.style.display = 'block';
+      } else {
+        brushSettingsPopup.style.display = 'none';
+      }
+
+      // Show eraser settings if eraser tool is selected
+      if (currentTool === 'eraser') {
+        eraserSettings.style.display = 'block';
+        canvas.classList.add('eraser-cursor');
+      } else {
+        eraserSettings.style.display = 'none';
+        canvas.classList.remove('eraser-cursor');
+      }
     });
   });
   
@@ -691,4 +745,24 @@ document.addEventListener('DOMContentLoaded', function() {
       userItem.remove();
     }
   }
+  
+  // Update brush color
+  brushColorInput.addEventListener('input', (e) => {
+    currentColor = e.target.value;
+  });
+  
+  // Update brush size
+  brushSizeSlider.addEventListener('input', (e) => {
+    currentWidth = e.target.value;
+  });
+  
+  // Update brush opacity
+  brushOpacitySlider.addEventListener('input', (e) => {
+    ctx.globalAlpha = e.target.value / 100; // Convert to 0-1 range
+  });
+  
+  // Update eraser size
+  eraserSizeSelect.addEventListener('change', (e) => {
+    currentWidth = parseInt(e.target.value);
+  });
 });
