@@ -261,42 +261,26 @@ io.on("connection", (socket) => {
 	console.log("A user connected:", socket.id);
 
 	// Join a room
-	socket.on("joinRoom", async ({ roomId, userName, userId, password }) => {
+	socket.on("joinRoom", async ({ roomId, userName, userId, password, hasLocalAuth }) => {
 		console.log(`User ${userName} (${userId}) attempting to join room ${roomId}`);
 
 		try {
-			// Get board info from database for password check
 			const boardForAuth = await Board.findOne({ roomId });
 			
-			// Handle password protection
 			if (boardForAuth && boardForAuth.isPasswordProtected) {
-				// Check if this user is the room owner
 				const isOwner = userId && boardForAuth.createdBy === userId;
-				
-				// Check if this socket has already been authorized
-				const isAuthorized = rooms[roomId] && 
-					rooms[roomId].authorizedUsers && 
-					rooms[roomId].authorizedUsers.includes(socket.id);
-				
-				// If not owner and not authorized, require password
-				if (!isOwner && !isAuthorized) {
-					// If password not provided or incorrect
+				const isAuthorized = rooms[roomId]?.authorizedUsers?.includes(userId || socket.id);
+
+				if (!isOwner && !isAuthorized && !hasLocalAuth) {
 					if (!password || password !== boardForAuth.password) {
 						socket.emit('passwordRequired', { roomId });
 						return;
 					}
 					
-					// Password correct - add to authorized users
-					if (!rooms[roomId]) {
-						rooms[roomId] = { users: {}, authorizedUsers: [] };
+					if (userId) {
+						if (!rooms[roomId]) rooms[roomId] = { users: {}, authorizedUsers: [] };
+						rooms[roomId].authorizedUsers.push(userId);
 					}
-					
-					if (!rooms[roomId].authorizedUsers) {
-						rooms[roomId].authorizedUsers = [];
-					}
-					
-					// Add to authorized users list
-					rooms[roomId].authorizedUsers.push(socket.id);
 				}
 			}
 

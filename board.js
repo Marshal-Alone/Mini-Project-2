@@ -462,6 +462,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const shareModal = document.getElementById('shareModal');
   const shareBtn = document.getElementById('shareBtn');
   const closeBtn = document.querySelector('.close-btn');
+  const closeBtn2 = document.querySelector('.close-btn2');
   const shareLink = document.getElementById('shareLink');
   const copyLinkBtn = document.getElementById('copyLinkBtn');
   
@@ -499,6 +500,10 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   
   closeBtn.addEventListener('click', () => {
+    shareModal.classList.remove('active');
+  });
+
+  closeBtn2.addEventListener('click', () => {
     shareModal.classList.remove('active');
   });
   
@@ -722,18 +727,20 @@ document.addEventListener('DOMContentLoaded', function() {
   socket.on('passwordCheckResult', ({ success, message }) => {
     if (success) {
       passwordModal.classList.remove('active');
-      
-      // Store the authorization in localStorage with room ID
-      localStorage.setItem(`board_auth_${roomId}`, 'true');
-      
-      // Join room with password
-      const userName = promptForUserName();
       const user = getUserInfo();
+      const userId = user ? user.id : null;
+      
+      // Store both room auth and user ID if available
+      localStorage.setItem(`board_auth_${roomId}`, 'true');
+      if (userId) {
+        localStorage.setItem(`board_user_${roomId}`, userId);
+      }
+      
       socket.emit('joinRoom', { 
         roomId, 
-        userName,
-        userId: user ? user.id : null,
-        password: document.getElementById('joinPassword').value
+        userName: promptForUserName(),
+        userId,
+        hasLocalAuth: true // Always true after successful auth
       });
     } else {
       const errorElement = document.getElementById('passwordError');
@@ -748,25 +755,24 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   // Handle user rights
-  socket.on('userRights', ({ isOwner }) => {
+  let isOwner = false;
+  socket.on('userRights', ({ isOwner: ownerStatus }) => {
+    isOwner = ownerStatus;
     // Show/hide share button based on ownership
     const shareBtn = document.getElementById('shareBtn');
     shareBtn.style.display = isOwner ? 'block' : 'none';
   });
   
   // Join room
-  const userName = promptForUserName();
+  const hasLocalAuth = localStorage.getItem(`board_auth_${roomId}`) === 'true';
+  const storedUserId = localStorage.getItem(`board_user_${roomId}`);
   const user = getUserInfo();
   
-  // Check if we already have authorization in localStorage
-  const hasLocalAuth = localStorage.getItem(`board_auth_${roomId}`) === 'true';
-
   socket.emit('joinRoom', { 
     roomId, 
-    userName,
-    userId: user ? user.id : null,
-    // Include hasLocalAuth flag to let server know this user was previously authorized
-    hasLocalAuth: hasLocalAuth
+    userName: promptForUserName(),
+    userId: storedUserId || (user ? user.id : null),
+    hasLocalAuth 
   });
   
   // Handle room data (users and history)
@@ -1052,4 +1058,44 @@ document.addEventListener('DOMContentLoaded', function() {
       passwordInput.style.display = hasPassword ? 'flex' : 'none';
     }
   });
+  
+  // Add exit button handler
+  document.getElementById('exitBtn').addEventListener('click', (e) => {
+    e.preventDefault(); // Prevent default link behavior
+    e.stopPropagation();
+    
+    // Show custom modal instead of default confirm
+    showExitConfirmation();
+  });
+
+  // Add this function for modern confirmation dialog
+  function showExitConfirmation() {
+    const modal = document.createElement('div');
+    modal.className = 'modern-confirm-modal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <h3>Leave Board?</h3>
+            <p>Are you sure you want to leave this board?</p>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelExit">Cancel</button>
+                <button class="btn btn-danger" id="confirmExit">Leave</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    // Handle confirm
+    document.getElementById('confirmExit').addEventListener('click', () => {
+        if (!isOwner) {
+            localStorage.removeItem(`board_auth_${roomId}`);
+            localStorage.removeItem(`board_user_${roomId}`);
+        }
+        window.location.href = '/';
+    });
+
+    // Handle cancel
+    document.getElementById('cancelExit').addEventListener('click', () => {
+        modal.remove();
+    });
+  }
 });
