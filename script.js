@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   };
   
-  // Update UI based on auth status
+  // Update UI based on auth status user auth
   const updateAuthUI = (user) => {
     const authLinks = document.querySelector('.nav-links');
     
@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', function() {
       if (user) {
         authLinks.innerHTML = `
           <a href="#features">Features</a>
-          <a href="#pricing">Pricing</a>
+          <!-- <a href="#pricing">Pricing</a> -->
           <a href="#about">About</a>
           <span class="user-greeting">Hello, ${user.name}</span>
           <button id="logoutBtn" class="btn btn-outline">Log out</button>
@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', function() {
       } else {
         authLinks.innerHTML = `
           <a href="#features">Features</a>
-          <a href="#pricing">Pricing</a>
+          <!-- <a href="#pricing">Pricing</a> -->
           <a href="#about">About</a>
           <a href="/login" class="btn btn-outline">Log in</a>
           <a href="/register" class="btn btn-primary">Sign up</a>

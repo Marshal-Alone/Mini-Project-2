@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', function() {
+  
   // Socket.io setup
   const socket = io();
   let currentUserId = null;
@@ -9,10 +10,11 @@ document.addEventListener('DOMContentLoaded', function() {
   const roomName = urlParams.get('name') || 'Untitled Board';
   
   // Set room name in the UI
-  document.getElementById('roomName').textContent = roomName;
+  // document.getElementById('roomName').textContent = roomName;  change
+
   
   // Set the title of the page
-  document.title = `${roomName} - Collaboard`;
+  document.title = `Marshal's - Collaboard`;
   
   // Canvas setup
   const canvas = document.getElementById('whiteboard');
@@ -79,7 +81,8 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Drawing functions
   function startDrawing(e) {
-    isDrawing = true;
+    // isDrawing = true; change
+    isDrawing = false; 
     
     // Get mouse position relative to canvas
     const rect = canvas.getBoundingClientRect();
@@ -391,8 +394,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
       // Show eraser settings if eraser tool is selected
       if (currentTool === 'eraser') {
-        eraserSettings.style.display = 'block';
-        canvas.classList.add('eraser-cursor');
+        // eraserSettings.style.display = 'block'; change
+        // canvas.classList.add('eraser-cursor'); change
       } else {
         eraserSettings.style.display = 'none';
         canvas.classList.remove('eraser-cursor');
@@ -467,18 +470,19 @@ document.addEventListener('DOMContentLoaded', function() {
   const copyLinkBtn = document.getElementById('copyLinkBtn');
   
   // Initially hide the share button until we confirm ownership
-  shareBtn.style.display = 'none';
+  // shareBtn.style.display = 'none'; change
   
   shareBtn.addEventListener('click', () => {
     // Set the share link
-    shareLink.value = window.location.href;
+    shareLink.value = "'Direct Link to join board wii be here'";
     
     // Generate and display a 6-digit code instead of the full roomId
     const boardCodeElement = document.getElementById('boardCode');
     if (boardCodeElement) {
       // Generate a 6-digit code from the roomId
       // Using a hash function to ensure consistent codes for the same roomId
-      const sixDigitCode = generateSixDigitCode(roomId);
+      // const sixDigitCode = generateSixDigitCode(roomId); change
+      const sixDigitCode = "SPECIAL CODE";
       boardCodeElement.textContent = sixDigitCode;
     }
     
@@ -510,7 +514,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Close modal when clicking outside
   window.addEventListener('click', (e) => {
     if (e.target === shareModal) {
-      shareModal.classList.remove('active');
+      // shareModal.classList.remove('active'); change
     }
   });
   
@@ -569,9 +573,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const passwordField = document.getElementById('boardPassword');
     const password = passwordField.value;
     if (password) {
-      socket.emit('setRoomPassword', { roomId, password });
+      // socket.emit('setRoomPassword', { roomId, password });
       showToast('Password protection enabled');
-      shareModal.classList.remove('active');
+      // shareModal.classList.remove('active');
     } else {
       alert('Please enter a password');
     }
@@ -600,15 +604,16 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Save button
   document.getElementById('saveBtn').addEventListener('click', () => {
+    showToast('Board saved as PNG');
     // Create a temporary link element
-    const link = document.createElement('a');
-    link.download = `${roomName}.png`;
-    link.href = canvas.toDataURL('image/png');
-    
-    // Trigger download
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // const link = document.createElement('a');
+    // link.download = `${roomName}.png`;
+    // link.href = canvas.toDataURL('image/png');
+                                                            // change
+    // // Trigger download
+    // document.body.appendChild(link);
+    // link.click();
+    // document.body.removeChild(link);
     
     showToast('Board saved as PNG');
   });
@@ -775,327 +780,102 @@ document.addEventListener('DOMContentLoaded', function() {
     hasLocalAuth 
   });
   
-  // Handle room data (users and history)
-  socket.on('roomData', ({ users, history: roomHistory }) => {
-    console.log('Received room data with', users.length, 'users and', roomHistory ? roomHistory.length : 0, 'history items');
+  // Immediately populate users list
+  populateStaticUsersList();
+  
+  // Make users panel fully visible
+  const usersPanel = document.getElementById('usersPanel');
+  if (usersPanel) {
+    usersPanel.style.transform = 'translateX(0)';
     
-    // Update users list
-    updateUsersList(users);
+    // Remove any classes that might hide it
+    usersPanel.classList.remove('collapsed');
     
-    // Apply drawing history if available
-    if (roomHistory && roomHistory.length > 0) {
-      // Clear canvas first to ensure we start fresh
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Ensure panel content is visible
+    const panelContent = usersPanel.querySelector('.panel-content');
+    if (panelContent) {
+      panelContent.style.display = 'block';
+    }
+  }
+  
+  // Hide toggle button
+  const toggleBtn = document.getElementById('toggleUsersPanel');
+  if (toggleBtn) {
+    toggleBtn.style.display = 'none';
+  }
+  
+  // Define the static users population function
+  function populateStaticUsersList() {
+    console.log("Populating static users list");
+    const usersList = document.getElementById('usersList');
+    console.log("Users list element:", usersList);
+    
+    if (usersList) {
+      // Clear existing content
+      usersList.innerHTML = '';
       
-      roomHistory.forEach(data => {
-        ctx.strokeStyle = data.color || '#000000';
-        ctx.lineWidth = data.width || data.lineWidth || 5;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
+      // Define static users
+      // const staticUsers = [
+      //   { name: 'MARSHAL', status: 'You', isCurrentUser: true, color: '#4a6ee0' },
+      //   { name: 'User 1', status: 'Online', color: '#e25563' },
+      //   { name: 'User 2', status: 'Drawing...', color: '#28a745' },
+      //   { name: 'User 3', status: 'Idle', color: '#f7b955' },
+      //   { name: 'User 4', status: 'Online', color: '#8a56e0' }
+      // ];
+      
+      // Add each user
+      staticUsers.forEach(user => {
+        // Create user element
+        const userElement = document.createElement('div');
+        userElement.className = 'user-item';
         
-        // Set opacity if available
-        if (data.opacity !== undefined) {
-          ctx.globalAlpha = data.opacity;
-        } else {
-          ctx.globalAlpha = 1.0;
-        }
+        // Generate initial
+        const initial = user.name.charAt(0);
         
-        // Handle different tools
-        switch (data.tool) {
-          case 'brush':
-            ctx.beginPath();
-            ctx.moveTo(data.startX, data.startY);
-            ctx.lineTo(data.endX, data.endY);
-            ctx.stroke();
-            break;
-            
-          case 'eraser':
-            ctx.globalCompositeOperation = 'destination-out';
-            ctx.beginPath();
-            ctx.arc(data.startX, data.startY, data.width / 2, 0, Math.PI * 2, false);
-            ctx.fill();
-            ctx.globalCompositeOperation = 'source-over';
-            break;
-            
-          case 'line':
-            ctx.beginPath();
-            ctx.moveTo(data.startX, data.startY);
-            ctx.lineTo(data.endX, data.endY);
-            ctx.stroke();
-            break;
-            
-          case 'rectangle':
-            ctx.beginPath();
-            ctx.rect(data.startX, data.startY, data.width, data.height);
-            ctx.stroke();
-            break;
-            
-          case 'circle':
-            ctx.beginPath();
-            ctx.arc(data.centerX, data.centerY, data.radius, 0, Math.PI * 2);
-            ctx.stroke();
-            break;
-            
-          case 'text':
-            ctx.font = `${data.fontSize}px Arial`;
-            ctx.fillStyle = data.color;
-            ctx.fillText(data.text, data.x, data.y);
-            break;
-        }
+        // Set HTML content
+        userElement.innerHTML = `
+          <div class="user-avatar" style="background-color: ${user.color};">
+            <span>${initial}</span>
+          </div>
+          <div class="user-info">
+            <div class="user-name">${user.name} ${user.isCurrentUser ? '(You)' : ''}</div>
+            <div class="user-status">${user.status}</div>
+          </div>
+        `;
         
-        // Reset for next drawing
-        ctx.globalAlpha = 1.0;
-        ctx.globalCompositeOperation = 'source-over';
+        // Add to list
+        usersList.appendChild(userElement);
+        console.log(`Added user: ${user.name}`);
       });
       
-      saveState();
-      showToast('Board loaded successfully', 'success');
-    }
-    
-    // Now that we have all data, send the userReady event
-    socket.emit('userReady', { roomId });
-    
-    // Update connection status
-    const connectionStatus = document.getElementById('connectionStatus');
-    connectionStatus.innerHTML = '<i class="fas fa-circle connected"></i> Connected';
-    
-    // Update document title
-    document.getElementById('pageTitle').textContent = roomName;
-  });
-  
-  // Handle user joined
-  socket.on('userJoined', (userData) => {
-    console.log('User joined:', userData);
-    
-    if (userData.id === socket.id) {
-      currentUserId = userData.id;
-    }
-    
-    // Add user to list
-    addUserToList(userData);
-    
-    // Show notification
-    if (userData.id !== socket.id) {
-      showToast(`${userData.name} joined the board`);
-    }
-  });
-  
-  // Handle user left
-  socket.on('userLeft', (user) => {
-    // Check if user is an object or just an ID
-    if (typeof user === 'object') {
-      removeUserFromList(user.id);
-      showToast(`${user.name} left the board`, 'info');
+      console.log(`Total users added: ${staticUsers.length}`);
     } else {
-      // Backward compatibility for older version
-      removeUserFromList(user);
-      showToast(`A user left the board`, 'info');
+      console.error("Could not find usersList element");
     }
-  });
+  }
   
-  // Handle user count update
-  socket.on('userCount', (count) => {
-    console.log('User count updated:', count);
-    document.getElementById('usersCount').textContent = `${count} user${count !== 1 ? 's' : ''}`;
-  });
+  // Add a fallback method to populate after a short delay in case DOM isn't ready
+  setTimeout(populateStaticUsersList, 1000);
   
-  // Update connection status
+  // Also try to populate whenever socket events happen
   socket.on('connect', () => {
-    console.log('Connected to server with socket ID:', socket.id);
-    
-    const connectionStatus = document.getElementById('connectionStatus');
-    connectionStatus.innerHTML = '<i class="fas fa-circle connected"></i> Connected';
-    connectionStatus.classList.add('connected');
-    connectionStatus.classList.remove('disconnected');
-    
-    // If we were previously connected and have a room ID, rejoin
-    if (roomId && userName) {
-      const user = getUserInfo();
-      socket.emit('joinRoom', { 
-        roomId, 
-        userName,
-        userId: user ? user.id : null
-      });
-    }
+    populateStaticUsersList();
   });
   
-  socket.on('disconnect', () => {
-    console.log('Disconnected from server');
-    
-    const connectionStatus = document.getElementById('connectionStatus');
-    connectionStatus.innerHTML = '<i class="fas fa-circle disconnected"></i> Disconnected';
-    connectionStatus.classList.remove('connected');
-    connectionStatus.classList.add('disconnected');
-    
-    showToast('Disconnected from server. Trying to reconnect...');
+  socket.on('roomData', () => {
+    populateStaticUsersList();
   });
   
-  // Add this error handling code near the socket events
-  socket.on('error', ({ message }) => {
-    showToast(`Error: ${message}`, 'error');
-    console.error('Server reported an error:', message);
-  });
+  // Override other user-related functions to maintain our static list
+  window.updateUsersList = function() {
+    // Do nothing, maintain static list
+  };
   
-  // Users list functions
-  function updateUsersList(users) {
-    console.log('Updating users list with', users.length, 'users');
-    
-    const usersList = document.getElementById('usersList');
-    const existingUsers = new Set();
-    
-    // First, mark all existing users for potential removal
-    Array.from(usersList.children).forEach(item => {
-      item.dataset.keep = "false";
-    });
-    
-    // Process all users in the new list
-    users.forEach(user => {
-      // Check if this user is already in the list by userId (more stable than socket ID)
-      let existingItem = null;
-      if (user.userId) {
-        existingItem = Array.from(usersList.children).find(item => 
-          item.dataset.userId === user.userId
-        );
-      }
-      
-      if (!existingItem) {
-        // No match by userId, try by socket id
-        existingItem = document.getElementById(`user-${user.id}`);
-      }
-      
-      if (existingItem) {
-        // User exists, update and keep
-        existingItem.dataset.keep = "true";
-        
-        // Update name or other properties if needed
-        const nameElement = existingItem.querySelector('.user-name');
-        if (nameElement) {
-          const isCurrentUser = user.id === socket.id;
-          nameElement.textContent = `${user.name} ${isCurrentUser ? '(You)' : ''}`;
-        }
-      } else {
-        // Add new user
-        addUserToList(user);
-      }
-      
-      // Remember this user was processed
-      existingUsers.add(user.id);
-    });
-    
-    // Remove any users that weren't in the updated list
-    Array.from(usersList.children).forEach(item => {
-      if (item.dataset.keep === "false") {
-        item.remove();
-      }
-    });
-  }
+  window.addUserToList = function() {
+    // Do nothing, maintain static list
+  };
   
-  function addUserToList(user) {
-    const usersList = document.getElementById('usersList');
-    
-    // Skip if already in list by socket ID
-    if (document.getElementById(`user-${user.id}`)) {
-      return;
-    }
-    
-    // Skip if already in list by user ID
-    if (user.userId && Array.from(usersList.children).some(item => 
-      item.dataset.userId === user.userId
-    )) {
-      return;
-    }
-    
-    const userItem = document.createElement('div');
-    userItem.className = 'user-item';
-    userItem.id = `user-${user.id}`;
-    userItem.dataset.userId = user.userId || user.id;
-    userItem.dataset.keep = "true"; // Mark as keeping
-    
-    const isCurrentUser = user.id === socket.id;
-    
-    userItem.innerHTML = `
-      <div class="user-avatar" style="background-color: ${user.color};">
-        <span>${user.initial}</span>
-      </div>
-      <div class="user-name">${user.name} ${isCurrentUser ? '(You)' : ''}</div>
-    `;
-    
-    usersList.appendChild(userItem);
-  }
-  
-  function removeUserFromList(userId) {
-    const userItem = document.getElementById(`user-${userId}`);
-    if (userItem) {
-      userItem.remove();
-    }
-  }
-  
-  // Update brush color
-  brushColorInput.addEventListener('input', (e) => {
-    currentColor = e.target.value;
-  });
-  
-  // Update brush size
-  brushSizeSlider.addEventListener('input', (e) => {
-    currentWidth = e.target.value;
-  });
-  
-  // Update brush opacity
-  brushOpacitySlider.addEventListener('input', (e) => {
-    ctx.globalAlpha = e.target.value / 100; // Convert to 0-1 range
-  });
-  
-  // Update eraser size
-  eraserSizeSelect.addEventListener('change', (e) => {
-    currentWidth = parseInt(e.target.value);
-  });
-  
-  // Handle room password updates
-  socket.on('roomPasswordUpdated', (hasPassword) => {
-    // Update checkbox if user has share modal open
-    if (document.getElementById('shareModal').classList.contains('active')) {
-      enablePasswordCheckbox.checked = hasPassword;
-      passwordInput.style.display = hasPassword ? 'flex' : 'none';
-    }
-  });
-  
-  // Add exit button handler
-  document.getElementById('exitBtn').addEventListener('click', (e) => {
-    e.preventDefault(); // Prevent default link behavior
-    e.stopPropagation();
-    
-    // Show custom modal instead of default confirm
-    showExitConfirmation();
-  });
-
-  // Add this function for modern confirmation dialog
-  function showExitConfirmation() {
-    const modal = document.createElement('div');
-    modal.className = 'modern-confirm-modal';
-    modal.innerHTML = `
-        <div class="modal-content">
-            <h3>Leave Board?</h3>
-            <p>Are you sure you want to leave this board?</p>
-            <div class="modal-actions">
-                <button class="btn btn-secondary" id="cancelExit">Cancel</button>
-                <button class="btn btn-danger" id="confirmExit">Leave</button>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(modal);
-
-    // Handle confirm
-    document.getElementById('confirmExit').addEventListener('click', () => {
-        if (!isOwner) {
-            localStorage.removeItem(`board_auth_${roomId}`);
-            localStorage.removeItem(`board_user_${roomId}`);
-        }
-        window.location.href = '/';
-    });
-
-    // Handle cancel
-    document.getElementById('cancelExit').addEventListener('click', () => {
-        modal.remove();
-    });
-  }
+  window.removeUserFromList = function() {
+    // Do nothing, maintain static list
+  };
 });
