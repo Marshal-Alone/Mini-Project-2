@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="board.css" />
+    <link rel="stylesheet" href="board-enhanced.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <script src="/socket.io/socket.io.js"></script>
     <script type="module" src="board.js"></script>
@@ -21,7 +22,7 @@
           <h2 id="roomName">Loading...</h2>
           <div class="room-status">
             <span id="connectionStatus"><i class="fas fa-circle-notch fa-spin"></i> Connecting...</span>
-            <span id="usersCount">1 user</span>
+            <span id="usersCount"><i class="fas fa-user"></i> 1 user</span>
           </div>
         </div>
         <div class="board-actions">
@@ -37,53 +38,75 @@
         </div>
       </div>
       <div class="toolbar">
-        <div class="tool-group">
-          <button class="tool-btn" id="eraserBtn" data-tool="eraser" title="Eraser">
-            <i class="fas fa-eraser"></i>
-          </button>
-          <button class="tool-btn active" data-tool="brush" title="Brush">
-            <i class="fas fa-paint-brush"></i>
-          </button>
-          <button class="tool-btn" data-tool="line" title="Line">
-            <i class="fas fa-slash"></i>
-          </button>
-          <button class="tool-btn" data-tool="rectangle" title="Rectangle">
-            <i class="far fa-square"></i>
-          </button>
-          <button class="tool-btn" data-tool="circle" title="Circle">
-            <i class="far fa-circle"></i>
-          </button>
-          <button class="tool-btn" data-tool="text" title="Text">
-            <i class="fas fa-font"></i>
-          </button>
+        <div class="tool-group drawing-tools">
+          <span class="tool-group-label">Draw</span>
+          <div class="tool-buttons">
+            <button class="tool-btn active" data-tool="brush" title="Brush">
+              <i class="fas fa-paint-brush"></i>
+            </button>
+            <button class="tool-btn" data-tool="line" title="Line">
+              <i class="fas fa-slash"></i>
+            </button>
+            <button class="tool-btn" data-tool="rectangle" title="Rectangle">
+              <i class="far fa-square"></i>
+            </button>
+            <button class="tool-btn" data-tool="circle" title="Circle">
+              <i class="far fa-circle"></i>
+            </button>
+            <button class="tool-btn" data-tool="text" title="Text">
+              <i class="fas fa-font"></i>
+            </button>
+            <button class="tool-btn" id="eraserBtn" data-tool="eraser" title="Eraser">
+              <i class="fas fa-eraser"></i>
+            </button>
+          </div>
         </div>
-        <div class="tool-group">
-          <label for="brushSize">Brush Size:</label>
-          <select id="brushSize">
-            <option value="2">Small</option>
-            <option value="5" selected>Medium</option>
-            <option value="10">Large</option>
-          </select>
-          <input type="color" id="colorPicker" value="#000000" title="Color">
+        
+        <div class="tool-group style-tools">
+          <span class="tool-group-label">Style</span>
+          <div class="style-controls">
+            <div class="size-control">
+              <label for="brushSize">Size:</label>
+              <select id="brushSize" class="styled-select">
+                <option value="2">Small</option>
+                <option value="5" selected>Medium</option>
+                <option value="10">Large</option>
+                <option value="15">X-Large</option>
+              </select>
+            </div>
+            <div class="color-control">
+              <label for="colorPicker">Color:</label>
+              <input type="color" id="colorPicker" value="#000000" title="Color">
+            </div>
+          </div>
         </div>
+
         <div class="tool-group" id="eraserSettings" style="display: none;">
-          <label for="eraserSize">Eraser Size:</label>
-          <select id="eraserSize">
-            <option value="5">Small</option>
-            <option value="10" selected>Medium</option>
-            <option value="15">Large</option>
-          </select>
+          <span class="tool-group-label">Eraser</span>
+          <div class="eraser-controls">
+            <label for="eraserSize">Size:</label>
+            <select id="eraserSize" class="styled-select">
+              <option value="5">Small</option>
+              <option value="10" selected>Medium</option>
+              <option value="15">Large</option>
+              <option value="25">X-Large</option>
+            </select>
+          </div>
         </div>
-        <div class="tool-group">
-          <button class="tool-btn" id="undoBtn" title="Undo">
-            <i class="fas fa-undo"></i>
-          </button>
-          <button class="tool-btn" id="redoBtn" title="Redo">
-            <i class="fas fa-redo"></i>
-          </button>
-          <button class="tool-btn" id="clearBtn" title="Clear All">
-            <i class="fas fa-trash"></i>
-          </button>
+
+        <div class="tool-group action-tools">
+          <span class="tool-group-label">Actions</span>
+          <div class="action-buttons">
+            <button class="tool-btn" id="undoBtn" title="Undo">
+              <i class="fas fa-undo"></i>
+            </button>
+            <button class="tool-btn" id="redoBtn" title="Redo">
+              <i class="fas fa-redo"></i>
+            </button>
+            <button class="tool-btn danger" id="clearBtn" title="Clear All">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
         </div>
       </div>
     </header>
@@ -95,8 +118,8 @@
     <div class="modal" id="shareModal">
       <div class="modal-content">
         <div class="modal-header">
-          <h3>Share this board</h3>
-          <button class="close-btn">&times;</button>
+          <h3><i class="fas fa-share-alt"></i> Share this board</h3>
+          <button class="close-btn" aria-label="Close"><i class="fas fa-times"></i></button>
         </div>
         <div class="modal-body">
           <p>Share this link with others to collaborate:</p>
@@ -107,32 +130,64 @@
             </button>
           </div>
           <div class="share-options">
-            <div class="option">
-              <input type="checkbox" id="enablePassword">
-              <label for="enablePassword">Protect with password</label>
+            <div class="option-group">
+              <div class="option">
+                <input type="checkbox" id="enablePassword">
+                <label for="enablePassword">Protect with password</label>
+              </div>
+              <div class="password-input" style="display: none;">
+                <input type="password" id="boardPassword" placeholder="Enter password">
+                <button class="btn btn-primary" id="setPasswordBtn">Set Password</button>
+              </div>
             </div>
-            <div class="password-input" style="display: none;">
-              <input type="password" id="boardPassword" placeholder="Enter password">
-              <button class="btn btn-primary" id="setPasswordBtn">Set Password</button>
+            <div class="option-group">
+              <div class="option">
+                <input type="checkbox" id="viewOnlyOption">
+                <label for="viewOnlyOption">Create view-only link</label>
+              </div>
+              <div class="view-only-link" style="display: none;">
+                <input type="text" id="viewOnlyLink" readonly>
+                <button class="btn btn-primary" id="copyViewOnlyLinkBtn">
+                  <i class="fas fa-copy"></i> Copy
+                </button>
+              </div>
             </div>
           </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary close-modal">Close</button>
         </div>
       </div>
     </div>
 
     <div class="users-panel" id="usersPanel">
       <div class="panel-header">
-        <h3>Connected Users</h3>
+        <h3><i class="fas fa-users"></i> Collaborators</h3>
+        <button class="toggle-panel" id="toggleUsersPanel" title="Toggle Users Panel">
+          <i class="fas fa-chevron-right"></i>
+        </button>
       </div>
-      <div class="users-list" id="usersList">
-        <!-- Users will be added dynamically -->
+      <div class="panel-content">
+        <div class="users-list" id="usersList">
+          <!-- Users will be added dynamically -->
+        </div>
+        <div class="panel-actions">
+          <button class="btn btn-sm" id="inviteUser">
+            <i class="fas fa-user-plus"></i> Invite
+          </button>
+        </div>
       </div>
     </div>
 
-    <div class="toast" id="toast">
-      <div class="toast-content">
-        <i class="fas fa-info-circle"></i>
-        <span id="toastMessage"></span>
+    <div class="toast-container" id="toastContainer">
+      <div class="toast" id="toast">
+        <div class="toast-content">
+          <i class="toast-icon fas fa-info-circle"></i>
+          <div class="toast-message-container">
+            <span id="toastMessage"></span>
+          </div>
+          <button class="toast-close" aria-label="Close notification"><i class="fas fa-times"></i></button>
+        </div>
       </div>
     </div>
 
