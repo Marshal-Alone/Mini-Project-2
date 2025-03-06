@@ -54,23 +54,27 @@ app.post("/api/register", async (req, res) => {
 	try {
 		const { fullName, email, password } = req.body;
 
+		console.log("\n=== Registration attempt ===");
+		console.log("Email:", email);
+
 		// Check if user already exists
 		const existingUser = await User.findOne({ email });
+		console.log("Existing user found:", existingUser ? "Yes" : "No");
 
 		if (existingUser) {
 			return res.status(400).json({ error: "User already exists" });
 		}
 
-		// Hash password
-		const salt = await bcrypt.genSalt(10);
-		const hashedPassword = await bcrypt.hash(password, salt);
-
-		// Create new user
+		// Create new user (password will be hashed by the pre-save middleware)
 		const user = await User.create({
 			fullName,
 			email,
-			password: hashedPassword,
+			password, // Pass the plain password, let the model handle hashing
 		});
+
+		console.log("User created with ID:", user._id);
+		console.log("Saved hash in database:", user.password);
+		console.log("=== End Registration ===\n");
 
 		// Create token
 		const token = jwt.sign(
@@ -104,15 +108,26 @@ app.post("/api/login", async (req, res) => {
 	try {
 		const { email, password } = req.body;
 
+		console.log("\n=== Login attempt ===");
+		console.log("Email:", email);
+		
 		// Get user
 		const user = await User.findOne({ email });
-
+		console.log("User found:", user ? "Yes" : "No");
+		
 		if (!user) {
 			return res.status(400).json({ error: "Invalid email or password" });
 		}
 
+		console.log("User ID:", user._id);
+		console.log("Input password:", password);
+		console.log("Stored hash:", user.password);
+		
 		// Check password
 		const validPassword = await bcrypt.compare(password, user.password);
+		console.log("Password match result:", validPassword);
+		console.log("=== End Login ===\n");
+		
 		if (!validPassword) {
 			return res.status(400).json({ error: "Invalid email or password" });
 		}
