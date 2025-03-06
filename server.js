@@ -12,9 +12,17 @@ const connectDB = require("./config/db");
 const User = require("./models/User");
 const Board = require("./models/Board");
 const bcrypt = require("bcryptjs");
+const mongoose = require('mongoose');
 
 // Connect to MongoDB
 connectDB();
+
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/collaboard', {
+	useNewUrlParser: true,
+	useUnifiedTopology: true
+})
+.then(() => console.log('Connected to MongoDB'))
+.catch(err => console.error('Could not connect to MongoDB', err));
 
 const app = express();
 const server = http.createServer(app);
@@ -218,22 +226,38 @@ io.on("connection", (socket) => {
 	socket.on("joinRoom", async ({ roomId, userName, userId }) => {
 		console.log(`User ${userName} (${userId}) attempting to join room ${roomId}`);
 
-		// Create room if it doesn't exist
+		// Add user to room in memory
 		if (!rooms[roomId]) {
 			rooms[roomId] = {
 				users: {},
-				history: [],
 			};
 		}
 
-		// Add user to room
+		// Check if this userId is already in the room with a different socket
+		let existingSocketId = null;
+		if (userId) {
+			for (const socketId in rooms[roomId].users) {
+				if (rooms[roomId].users[socketId].userId === userId) {
+					existingSocketId = socketId;
+					break;
+				}
+			}
+		}
+
+		// If user exists with different socket ID, remove the old entry
+		if (existingSocketId && existingSocketId !== socket.id) {
+			console.log(`User ${userName} reconnected with new socket. Replacing old socket.`);
+			delete rooms[roomId].users[existingSocketId];
+		}
+
+		// Add user details
 		const socketId = socket.id;
 		const userColor = getRandomColor();
 		const userInitial = userName.charAt(0).toUpperCase();
 
 		rooms[roomId].users[socketId] = {
 			id: socketId,
-			userId: userId || socketId, // Use provided userId or fallback to socket.id
+			userId: userId || socketId,
 			name: userName,
 			color: userColor,
 			initial: userInitial,
@@ -243,78 +267,120 @@ io.on("connection", (socket) => {
 		socket.join(roomId);
 		socket.roomId = roomId;
 
-		console.log(`Room ${roomId} now has ${Object.keys(rooms[roomId].users).length} users`);
+		// Find or create board in the database
+		try {
+			let board = await Board.findOne({ roomId });
+			
+			if (!board) {
+				board = new Board({
+					roomId,
+					name: roomId, // Default name is the roomId
+					history: [],
+					createdBy: userId || socketId
+				});
+				await board.save();
+			}
 
-		// Send current users and drawing history to the new user
-		socket.emit("roomData", {
-			users: Object.values(rooms[roomId].users),
-			history: rooms[roomId].history,
-		});
+			// Send board history from database to the new user
+			socket.emit("roomData", {
+				users: Object.values(rooms[roomId].users),
+				history: board.history
+			});
 
-		// Notify all clients in the room about the new user
-		io.to(roomId).emit("userJoined", rooms[roomId].users[socketId]);
+			// Notify all clients about the new user
+			io.to(roomId).emit("userJoined", rooms[roomId].users[socketId]);
+			io.to(roomId).emit("userCount", Object.keys(rooms[roomId].users).length);
 
-		// Update user count
-		io.to(roomId).emit("userCount", Object.keys(rooms[roomId].users).length);
-
-		console.log(`User ${userName} joined room ${roomId}`);
+			console.log(`User ${userName} joined room ${roomId}`);
+		} catch (error) {
+			console.error('Error retrieving board data:', error);
+			socket.emit('error', { message: 'Could not load board data' });
+		}
 	});
 
 	// Handle drawing events
-	socket.on("drawEvent", (data) => {
-		// Broadcast the drawing or erasing event to all other users in the room
-		socket.to(socket.roomId).emit("drawEvent", data);
+	socket.on("drawEvent", async (data) => {
+		const roomId = socket.roomId;
+
+		// Broadcast to other users in the room
+		socket.to(roomId).emit("drawEvent", data);
+
+		// Save to database
+		try {
+			if (roomId) {
+				await Board.updateOne(
+					{ roomId },
+					{ 
+						$push: { history: data },
+						$set: { updatedAt: Date.now() }
+					}
+				);
+			}
+		} catch (error) {
+			console.error('Error saving drawing event:', error);
+		}
 	});
 
 	// Handle clear canvas event
 	socket.on("clearCanvas", async () => {
 		const roomId = socket.roomId;
 
-		if (roomId && rooms[roomId]) {
-			// Clear history
-			rooms[roomId].history = [];
-
+		if (roomId) {
 			// Broadcast to all other users in the room
 			socket.to(roomId).emit("clearCanvas");
+
+			// Clear history in database
+			try {
+				await Board.updateOne(
+					{ roomId },
+					{ 
+						$set: { 
+							history: [],
+							updatedAt: Date.now()
+						}
+					}
+				);
+				console.log(`Board ${roomId} cleared by ${socket.id}`);
+			} catch (error) {
+				console.error('Error clearing board history:', error);
+			}
 		}
 	});
 
 	// Handle disconnection
 	socket.on("disconnect", () => {
+		console.log("User disconnected:", socket.id);
+		
+		// Find which room this socket was in
 		const roomId = socket.roomId;
-
-		if (roomId && rooms[roomId] && rooms[roomId].users[socket.id]) {
-			// Get user data before removing
-			const userData = rooms[roomId].users[socket.id];
-
+		if (roomId && rooms[roomId] && rooms[roomId].users) {
+			// Get user info before removing
+			const userInfo = rooms[roomId].users[socket.id];
+			
 			// Remove user from room
 			delete rooms[roomId].users[socket.id];
-
-			// Notify all clients in the room
-			io.to(roomId).emit("userLeft", userData);
-
-			// Update user count
+			
+			// Notify other users with more information
+			if (userInfo) {
+				io.to(roomId).emit("userLeft", {
+					id: socket.id,
+					name: userInfo.name || "Unknown User"
+				});
+			} else {
+				io.to(roomId).emit("userLeft", {
+					id: socket.id,
+					name: "Unknown User"
+				});
+			}
+			
 			io.to(roomId).emit("userCount", Object.keys(rooms[roomId].users).length);
-
-			console.log(`User ${userData.name} left room ${roomId}`);
-			console.log(`Room ${roomId} now has ${Object.keys(rooms[roomId].users).length} users`);
-
-			// Save history before cleaning up empty rooms
+			
+			// If room is empty, clean up (but don't delete from DB)
 			if (Object.keys(rooms[roomId].users).length === 0) {
-				// Save history to database before deleting room
-				try {
-					Board.updateOne({ roomId }, { history: rooms[roomId].history }).then(() => {
-						delete rooms[roomId];
-						console.log(`Room ${roomId} saved to database and deleted from memory (empty)`);
-					});
-				} catch (err) {
-					console.error("Error saving board history before cleanup:", err);
-					delete rooms[roomId];
-				}
+				delete rooms[roomId];
+				console.log(`Room ${roomId} is now empty and removed from memory`);
 			}
 		}
-
-		console.log("User disconnected:", socket.id);
 	});
 });
 

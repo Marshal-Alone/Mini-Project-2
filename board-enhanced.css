@@ -458,6 +458,54 @@ body.board-page {
   padding: 0.25rem;
 }
 
+/* Toast types */
+.toast.success .toast-icon {
+  color: var(--success-color);
+}
+
+.toast.error .toast-icon {
+  color: var(--danger-color);
+}
+
+.toast.warning .toast-icon {
+  color: var(--warning-color);
+}
+
+/* Add this helper function to your JavaScript */
+function showToast(message, type = 'info') {
+  const toast = document.getElementById('toast');
+  const toastMessage = document.getElementById('toastMessage');
+  const toastIcon = document.querySelector('.toast-icon');
+  
+  // Set the message
+  toastMessage.textContent = message;
+  
+  // Remove existing type classes
+  toast.classList.remove('info', 'success', 'error', 'warning');
+  
+  // Add the type class
+  toast.classList.add(type);
+  
+  // Update icon based on type
+  if (type === 'success') {
+    toastIcon.className = 'toast-icon fas fa-check-circle';
+  } else if (type === 'error') {
+    toastIcon.className = 'toast-icon fas fa-exclamation-circle';
+  } else if (type === 'warning') {
+    toastIcon.className = 'toast-icon fas fa-exclamation-triangle';
+  } else {
+    toastIcon.className = 'toast-icon fas fa-info-circle';
+  }
+  
+  // Show the toast
+  toast.classList.add('show');
+  
+  // Hide after 3 seconds
+  setTimeout(() => {
+    toast.classList.remove('show');
+  }, 3000);
+}
+
 /* Responsive Styles */
 @media (max-width: 768px) {
   .toolbar {

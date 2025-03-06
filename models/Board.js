@@ -1,26 +1,58 @@
 const mongoose = require('mongoose');
 
-const boardSchema = new mongoose.Schema({
-    name: {
-        type: String,
-        required: true
-    },
+const BoardSchema = new mongoose.Schema({
     roomId: {
         type: String,
         required: true,
-        unique: true
+        unique: true,
+        index: true
     },
-    createdBy: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true
+    name: {
+        type: String,
+        default: 'Untitled Board'
     },
+    history: [{
+        tool: String,
+        startX: Number,
+        startY: Number,
+        endX: Number,
+        endY: Number,
+        width: Number,
+        color: String,
+        opacity: Number,
+        // For shapes
+        centerX: Number,
+        centerY: Number,
+        radius: Number,
+        height: Number,
+        // For text
+        text: String,
+        fontSize: Number,
+        x: Number,
+        y: Number,
+        // For line width
+        lineWidth: Number
+    }],
     createdAt: {
         type: Date,
         default: Date.now
-    }
+    },
+    updatedAt: {
+        type: Date,
+        default: Date.now
+    },
+    isPasswordProtected: {
+        type: Boolean,
+        default: false
+    },
+    password: String,
+    createdBy: String
 });
 
-const Board = mongoose.model('Board', boardSchema);
+// Update the updatedAt timestamp before saving
+BoardSchema.pre('save', function(next) {
+    this.updatedAt = Date.now();
+    next();
+});
 
-module.exports = Board;
+module.exports = mongoose.model('Board', BoardSchema);

@@ -529,11 +529,12 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   
   // Toast notification
-  function showToast(message) {
+  function showToast(message, type = 'info') {
     const toast = document.getElementById('toast');
     const toastMessage = document.getElementById('toastMessage');
     
     toastMessage.textContent = message;
+    toast.className = `toast ${type}`;
     toast.classList.add('active');
     
     // Hide toast after 3 seconds
@@ -586,25 +587,44 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Handle room data (users and history)
   socket.on('roomData', ({ users, history: roomHistory }) => {
-    console.log('Received room data with', users.length, 'users and', roomHistory.length, 'history items');
+    console.log('Received room data with', users.length, 'users and', roomHistory ? roomHistory.length : 0, 'history items');
     
     // Update users list
     updateUsersList(users);
     
-    // Apply drawing history
+    // Apply drawing history if available
     if (roomHistory && roomHistory.length > 0) {
+      // Clear canvas first to ensure we start fresh
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
       roomHistory.forEach(data => {
-        ctx.strokeStyle = data.color;
-        ctx.lineWidth = data.width || data.lineWidth;
+        ctx.strokeStyle = data.color || '#000000';
+        ctx.lineWidth = data.width || data.lineWidth || 5;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         
+        // Set opacity if available
+        if (data.opacity !== undefined) {
+          ctx.globalAlpha = data.opacity;
+        } else {
+          ctx.globalAlpha = 1.0;
+        }
+        
+        // Handle different tools
         switch (data.tool) {
           case 'brush':
             ctx.beginPath();
             ctx.moveTo(data.startX, data.startY);
             ctx.lineTo(data.endX, data.endY);
             ctx.stroke();
+            break;
+            
+          case 'eraser':
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.beginPath();
+            ctx.arc(data.startX, data.startY, data.width / 2, 0, Math.PI * 2, false);
+            ctx.fill();
+            ctx.globalCompositeOperation = 'source-over';
             break;
             
           case 'line':
@@ -632,9 +652,14 @@ document.addEventListener('DOMContentLoaded', function() {
             ctx.fillText(data.text, data.x, data.y);
             break;
         }
+        
+        // Reset for next drawing
+        ctx.globalAlpha = 1.0;
+        ctx.globalCompositeOperation = 'source-over';
       });
       
       saveState();
+      showToast('Board loaded successfully', 'success');
     }
   });
   
@@ -656,14 +681,16 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   
   // Handle user left
-  socket.on('userLeft', (userData) => {
-    console.log('User left:', userData);
-    
-    // Remove user from list
-    removeUserFromList(userData.id);
-    
-    // Show notification
-    showToast(`${userData.name} left the board`);
+  socket.on('userLeft', (user) => {
+    // Check if user is an object or just an ID
+    if (typeof user === 'object') {
+      removeUserFromList(user.id);
+      showToast(`${user.name} left the board`, 'info');
+    } else {
+      // Backward compatibility for older version
+      removeUserFromList(user);
+      showToast(`A user left the board`, 'info');
+    }
   });
   
   // Handle user count update
@@ -703,29 +730,86 @@ document.addEventListener('DOMContentLoaded', function() {
     showToast('Disconnected from server. Trying to reconnect...');
   });
   
+  // Add this error handling code near the socket events
+  socket.on('error', ({ message }) => {
+    showToast(`Error: ${message}`, 'error');
+    console.error('Server reported an error:', message);
+  });
+  
   // Users list functions
   function updateUsersList(users) {
     console.log('Updating users list with', users.length, 'users');
     
     const usersList = document.getElementById('usersList');
-    usersList.innerHTML = '';
+    const existingUsers = new Set();
     
+    // First, mark all existing users for potential removal
+    Array.from(usersList.children).forEach(item => {
+      item.dataset.keep = "false";
+    });
+    
+    // Process all users in the new list
     users.forEach(user => {
-      addUserToList(user);
+      // Check if this user is already in the list by userId (more stable than socket ID)
+      let existingItem = null;
+      if (user.userId) {
+        existingItem = Array.from(usersList.children).find(item => 
+          item.dataset.userId === user.userId
+        );
+      }
+      
+      if (!existingItem) {
+        // No match by userId, try by socket id
+        existingItem = document.getElementById(`user-${user.id}`);
+      }
+      
+      if (existingItem) {
+        // User exists, update and keep
+        existingItem.dataset.keep = "true";
+        
+        // Update name or other properties if needed
+        const nameElement = existingItem.querySelector('.user-name');
+        if (nameElement) {
+          const isCurrentUser = user.id === socket.id;
+          nameElement.textContent = `${user.name} ${isCurrentUser ? '(You)' : ''}`;
+        }
+      } else {
+        // Add new user
+        addUserToList(user);
+      }
+      
+      // Remember this user was processed
+      existingUsers.add(user.id);
+    });
+    
+    // Remove any users that weren't in the updated list
+    Array.from(usersList.children).forEach(item => {
+      if (item.dataset.keep === "false") {
+        item.remove();
+      }
     });
   }
   
   function addUserToList(user) {
     const usersList = document.getElementById('usersList');
     
-    // Check if user already exists
+    // Skip if already in list by socket ID
     if (document.getElementById(`user-${user.id}`)) {
+      return;
+    }
+    
+    // Skip if already in list by user ID
+    if (user.userId && Array.from(usersList.children).some(item => 
+      item.dataset.userId === user.userId
+    )) {
       return;
     }
     
     const userItem = document.createElement('div');
     userItem.className = 'user-item';
     userItem.id = `user-${user.id}`;
+    userItem.dataset.userId = user.userId || user.id;
+    userItem.dataset.keep = "true"; // Mark as keeping
     
     const isCurrentUser = user.id === socket.id;
     
