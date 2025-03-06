@@ -106,6 +106,29 @@ document.addEventListener('DOMContentLoaded', function() {
         roomName = roomNameInput.placeholder.replace("e.g. ", ""); // Get the random name
       }
       
+      // Check if the entered name is a 6-digit code (all numbers, exactly 6 digits)
+      const isBoardCode = /^\d{6}$/.test(roomName);
+      
+      // If it's a board code, try to find the corresponding board
+      if (isBoardCode) {
+        try {
+          // Call API to find board by code
+          const response = await fetch(`/api/boards/code/${roomName}`);
+          
+          if (response.ok) {
+            const data = await response.json();
+            
+            // Redirect to the existing board
+            window.location.href = `/board?room=${encodeURIComponent(data.roomId)}&name=${encodeURIComponent(data.name)}`;
+            return; // Exit function early
+          } 
+          // If not found or error, continue to create a new board
+        } catch (error) {
+          console.log('Error finding board by code:', error);
+          // Continue with board creation
+        }
+      }
+      
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       
       if (user && user.id) {

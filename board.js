@@ -465,13 +465,38 @@ document.addEventListener('DOMContentLoaded', function() {
   const shareLink = document.getElementById('shareLink');
   const copyLinkBtn = document.getElementById('copyLinkBtn');
   
+  // Initially hide the share button until we confirm ownership
+  shareBtn.style.display = 'none';
+  
   shareBtn.addEventListener('click', () => {
     // Set the share link
     shareLink.value = window.location.href;
     
+    // Generate and display a 6-digit code instead of the full roomId
+    const boardCodeElement = document.getElementById('boardCode');
+    if (boardCodeElement) {
+      // Generate a 6-digit code from the roomId
+      // Using a hash function to ensure consistent codes for the same roomId
+      const sixDigitCode = generateSixDigitCode(roomId);
+      boardCodeElement.textContent = sixDigitCode;
+    }
+    
     // Show the modal
     shareModal.classList.add('active');
   });
+  
+  // Function to generate a 6-digit code from roomId
+  function generateSixDigitCode(roomId) {
+    // Simple hash function to generate a numeric code from a string
+    let numericValue = 0;
+    for (let i = 0; i < roomId.length; i++) {
+      numericValue += roomId.charCodeAt(i);
+    }
+    
+    // Ensure it's exactly 6 digits by using modulo and padding
+    let sixDigitCode = (numericValue % 900000 + 100000).toString();
+    return sixDigitCode;
+  }
   
   closeBtn.addEventListener('click', () => {
     shareModal.classList.remove('active');
@@ -493,25 +518,80 @@ document.addEventListener('DOMContentLoaded', function() {
     showToast('Link copied to clipboard!');
   });
   
+  // Add a new copy button for the board code
+  const copyCodeBtn = document.getElementById('copyCodeBtn');
+  if (copyCodeBtn) {
+    copyCodeBtn.addEventListener('click', () => {
+      const boardCode = document.getElementById('boardCode').textContent;
+      navigator.clipboard.writeText(boardCode).then(() => {
+        showToast('Board code copied to clipboard!');
+      }).catch(err => {
+        console.error('Could not copy board code: ', err);
+        // Fallback method
+        const tempInput = document.createElement('input');
+        tempInput.value = boardCode;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
+        showToast('Board code copied to clipboard!');
+      });
+    });
+  }
+  
   // Password protection toggle
   const enablePasswordCheckbox = document.getElementById('enablePassword');
   const passwordInput = document.querySelector('.password-input');
   
+  // Check if room already has password protection
+  socket.on('roomPasswordStatus', (hasPassword) => {
+    enablePasswordCheckbox.checked = hasPassword;
+    passwordInput.style.display = hasPassword ? 'flex' : 'none';
+  });
+  
   enablePasswordCheckbox.addEventListener('change', () => {
     passwordInput.style.display = enablePasswordCheckbox.checked ? 'flex' : 'none';
+    
+    // If checkbox is unchecked, remove password protection
+    if (!enablePasswordCheckbox.checked) {
+      socket.emit('removeRoomPassword', { roomId });
+      showToast('Password protection removed');
+    }
   });
   
   // Set password button
   document.getElementById('setPasswordBtn').addEventListener('click', () => {
-    const password = document.getElementById('boardPassword').value;
+    const passwordField = document.getElementById('boardPassword');
+    const password = passwordField.value;
     if (password) {
-      // In a real app, this would set the password on the server
+      socket.emit('setRoomPassword', { roomId, password });
       showToast('Password protection enabled');
       shareModal.classList.remove('active');
     } else {
       alert('Please enter a password');
     }
   });
+  
+  // Add password visibility toggle
+  const togglePasswordBtn = document.createElement('button');
+  togglePasswordBtn.type = 'button';
+  togglePasswordBtn.className = 'btn password-toggle';
+  togglePasswordBtn.innerHTML = '<i class="fas fa-eye"></i>';
+  togglePasswordBtn.title = 'Show/Hide Password';
+  togglePasswordBtn.addEventListener('click', () => {
+    const passwordField = document.getElementById('boardPassword');
+    if (passwordField.type === 'password') {
+      passwordField.type = 'text';
+      togglePasswordBtn.innerHTML = '<i class="fas fa-eye-slash"></i>';
+    } else {
+      passwordField.type = 'password';
+      togglePasswordBtn.innerHTML = '<i class="fas fa-eye"></i>';
+    }
+  });
+  
+  // Insert toggle button after password input
+  const passwordInputContainer = document.querySelector('.password-input');
+  passwordInputContainer.insertBefore(togglePasswordBtn, document.getElementById('setPasswordBtn'));
   
   // Save button
   document.getElementById('saveBtn').addEventListener('click', () => {
@@ -576,13 +656,117 @@ document.addEventListener('DOMContentLoaded', function() {
     return userName;
   }
   
+  // Create password verification modal
+  const passwordModal = document.createElement('div');
+  passwordModal.className = 'modal';
+  passwordModal.id = 'passwordModal';
+  passwordModal.innerHTML = `
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3><i class="fas fa-lock"></i> Password Required</h3>
+      </div>
+      <div class="modal-body">
+        <p>This board is password protected. Please enter the password to join.</p>
+        <div class="password-input" style="display: flex;">
+          <input type="password" id="joinPassword" placeholder="Enter password">
+          <button id="toggleJoinPassword" class="btn password-toggle">
+            <i class="fas fa-eye"></i>
+          </button>
+          <button class="btn btn-primary" id="submitPasswordBtn">Join</button>
+        </div>
+        <div id="passwordError" class="error-message" style="display: none;"></div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(passwordModal);
+
+  // Add password toggle functionality
+  document.getElementById('toggleJoinPassword').addEventListener('click', () => {
+    const passwordField = document.getElementById('joinPassword');
+    const toggleBtn = document.getElementById('toggleJoinPassword');
+    
+    if (passwordField.type === 'password') {
+      passwordField.type = 'text';
+      toggleBtn.innerHTML = '<i class="fas fa-eye-slash"></i>';
+    } else {
+      passwordField.type = 'password';
+      toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
+    }
+  });
+
+  // Submit password button
+  document.getElementById('submitPasswordBtn').addEventListener('click', submitPassword);
+
+  // Submit password on enter key
+  document.getElementById('joinPassword').addEventListener('keyup', (e) => {
+    if (e.key === 'Enter') {
+      submitPassword();
+    }
+  });
+
+  function submitPassword() {
+    const password = document.getElementById('joinPassword').value;
+    const errorElement = document.getElementById('passwordError');
+    
+    if (!password) {
+      errorElement.textContent = 'Please enter a password';
+      errorElement.style.display = 'block';
+      return;
+    }
+    
+    errorElement.style.display = 'none';
+    socket.emit('checkRoomPassword', { roomId, password });
+  }
+
+  // Handle password check result
+  socket.on('passwordCheckResult', ({ success, message }) => {
+    if (success) {
+      passwordModal.classList.remove('active');
+      
+      // Store the authorization in localStorage with room ID
+      localStorage.setItem(`board_auth_${roomId}`, 'true');
+      
+      // Join room with password
+      const userName = promptForUserName();
+      const user = getUserInfo();
+      socket.emit('joinRoom', { 
+        roomId, 
+        userName,
+        userId: user ? user.id : null,
+        password: document.getElementById('joinPassword').value
+      });
+    } else {
+      const errorElement = document.getElementById('passwordError');
+      errorElement.textContent = message || 'Incorrect password';
+      errorElement.style.display = 'block';
+    }
+  });
+
+  // Handle password required
+  socket.on('passwordRequired', () => {
+    passwordModal.classList.add('active');
+  });
+
+  // Handle user rights
+  socket.on('userRights', ({ isOwner }) => {
+    // Show/hide share button based on ownership
+    const shareBtn = document.getElementById('shareBtn');
+    shareBtn.style.display = isOwner ? 'block' : 'none';
+  });
+  
   // Join room
   const userName = promptForUserName();
   const user = getUserInfo();
+  
+  // Check if we already have authorization in localStorage
+  const hasLocalAuth = localStorage.getItem(`board_auth_${roomId}`) === 'true';
+
   socket.emit('joinRoom', { 
     roomId, 
     userName,
-    userId: user ? user.id : null
+    userId: user ? user.id : null,
+    // Include hasLocalAuth flag to let server know this user was previously authorized
+    hasLocalAuth: hasLocalAuth
   });
   
   // Handle room data (users and history)
@@ -661,6 +845,16 @@ document.addEventListener('DOMContentLoaded', function() {
       saveState();
       showToast('Board loaded successfully', 'success');
     }
+    
+    // Now that we have all data, send the userReady event
+    socket.emit('userReady', { roomId });
+    
+    // Update connection status
+    const connectionStatus = document.getElementById('connectionStatus');
+    connectionStatus.innerHTML = '<i class="fas fa-circle connected"></i> Connected';
+    
+    // Update document title
+    document.getElementById('pageTitle').textContent = roomName;
   });
   
   // Handle user joined
@@ -848,5 +1042,14 @@ document.addEventListener('DOMContentLoaded', function() {
   // Update eraser size
   eraserSizeSelect.addEventListener('change', (e) => {
     currentWidth = parseInt(e.target.value);
+  });
+  
+  // Handle room password updates
+  socket.on('roomPasswordUpdated', (hasPassword) => {
+    // Update checkbox if user has share modal open
+    if (document.getElementById('shareModal').classList.contains('active')) {
+      enablePasswordCheckbox.checked = hasPassword;
+      passwordInput.style.display = hasPassword ? 'flex' : 'none';
+    }
   });
 });

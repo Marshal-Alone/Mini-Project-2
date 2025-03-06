@@ -218,57 +218,131 @@ app.get("/api/boards", authenticateToken, async (req, res) => {
 	}
 });
 
+// Add this new route to find board by 6-digit code
+app.get("/api/boards/code/:code", async (req, res) => {
+	try {
+		const { code } = req.params;
+		
+		// Get all boards (ideally you would have a more efficient lookup)
+		const boards = await Board.find({});
+		
+		// Find the board with the matching code
+		// We'll compute the 6-digit code for each board and check for a match
+		for (const board of boards) {
+			// Use the same algorithm as in board.js to generate the code
+			let numericValue = 0;
+			const roomId = board.roomId;
+			
+			for (let i = 0; i < roomId.length; i++) {
+				numericValue += roomId.charCodeAt(i);
+			}
+			
+			const boardCode = (numericValue % 900000 + 100000).toString();
+			
+			if (boardCode === code) {
+				// Found the matching board
+				return res.status(200).json({
+					roomId: board.roomId,
+					name: board.name
+				});
+			}
+		}
+		
+		// If no board found with that code
+		return res.status(404).json({ error: "Board not found" });
+	} catch (error) {
+		console.error("Error finding board by code:", error);
+		res.status(500).json({ error: "Server error" });
+	}
+});
+
 // Socket.io connection handling
 io.on("connection", (socket) => {
 	console.log("A user connected:", socket.id);
 
 	// Join a room
-	socket.on("joinRoom", async ({ roomId, userName, userId }) => {
+	socket.on("joinRoom", async ({ roomId, userName, userId, password }) => {
 		console.log(`User ${userName} (${userId}) attempting to join room ${roomId}`);
 
-		// Add user to room in memory
-		if (!rooms[roomId]) {
-			rooms[roomId] = {
-				users: {},
-			};
-		}
-
-		// Check if this userId is already in the room with a different socket
-		let existingSocketId = null;
-		if (userId) {
-			for (const socketId in rooms[roomId].users) {
-				if (rooms[roomId].users[socketId].userId === userId) {
-					existingSocketId = socketId;
-					break;
+		try {
+			// Get board info from database for password check
+			const boardForAuth = await Board.findOne({ roomId });
+			
+			// Handle password protection
+			if (boardForAuth && boardForAuth.isPasswordProtected) {
+				// Check if this user is the room owner
+				const isOwner = userId && boardForAuth.createdBy === userId;
+				
+				// Check if this socket has already been authorized
+				const isAuthorized = rooms[roomId] && 
+					rooms[roomId].authorizedUsers && 
+					rooms[roomId].authorizedUsers.includes(socket.id);
+				
+				// If not owner and not authorized, require password
+				if (!isOwner && !isAuthorized) {
+					// If password not provided or incorrect
+					if (!password || password !== boardForAuth.password) {
+						socket.emit('passwordRequired', { roomId });
+						return;
+					}
+					
+					// Password correct - add to authorized users
+					if (!rooms[roomId]) {
+						rooms[roomId] = { users: {}, authorizedUsers: [] };
+					}
+					
+					if (!rooms[roomId].authorizedUsers) {
+						rooms[roomId].authorizedUsers = [];
+					}
+					
+					// Add to authorized users list
+					rooms[roomId].authorizedUsers.push(socket.id);
 				}
 			}
-		}
 
-		// If user exists with different socket ID, remove the old entry
-		if (existingSocketId && existingSocketId !== socket.id) {
-			console.log(`User ${userName} reconnected with new socket. Replacing old socket.`);
-			delete rooms[roomId].users[existingSocketId];
-		}
+			// Add user to room in memory
+			if (!rooms[roomId]) {
+				rooms[roomId] = {
+					users: {},
+					authorizedUsers: []
+				};
+			}
 
-		// Add user details
-		const socketId = socket.id;
-		const userColor = getRandomColor();
-		const userInitial = userName.charAt(0).toUpperCase();
+			// Check if this userId is already in the room with a different socket
+			let existingSocketId = null;
+			if (userId) {
+				for (const socketId in rooms[roomId].users) {
+					if (rooms[roomId].users[socketId].userId === userId) {
+						existingSocketId = socketId;
+						break;
+					}
+				}
+			}
 
-		rooms[roomId].users[socketId] = {
-			id: socketId,
-			userId: userId || socketId,
-			name: userName,
-			color: userColor,
-			initial: userInitial,
-		};
+			// If user exists with different socket ID, remove the old entry
+			if (existingSocketId && existingSocketId !== socket.id) {
+				console.log(`User ${userName} reconnected with new socket. Replacing old socket.`);
+				delete rooms[roomId].users[existingSocketId];
+			}
 
-		// Join the room
-		socket.join(roomId);
-		socket.roomId = roomId;
+			// Add user details
+			const socketId = socket.id;
+			const userColor = getRandomColor();
+			const userInitial = userName.charAt(0).toUpperCase();
 
-		// Find or create board in the database
-		try {
+			rooms[roomId].users[socketId] = {
+				id: socketId,
+				userId: userId || socketId,
+				name: userName,
+				color: userColor,
+				initial: userInitial,
+			};
+
+			// Join the room
+			socket.join(roomId);
+			socket.roomId = roomId;
+
+			// Find or create board in the database
 			let board = await Board.findOne({ roomId });
 			
 			if (!board) {
@@ -293,12 +367,143 @@ io.on("connection", (socket) => {
 
 			console.log(`User ${userName} joined room ${roomId}`);
 		} catch (error) {
-			console.error('Error retrieving board data:', error);
-			socket.emit('error', { message: 'Could not load board data' });
+			console.error("Error joining room:", error);
+			socket.emit('error', { message: 'Error joining room' });
 		}
 	});
 
-	// Handle drawing events
+	// Check password for a room
+	socket.on('checkRoomPassword', async ({ roomId, password }) => {
+		try {
+			const board = await Board.findOne({ roomId });
+			
+			if (!board) {
+				socket.emit('passwordCheckResult', { 
+					success: false, 
+					message: 'Room not found' 
+				});
+				return;
+			}
+			
+			if (!board.isPasswordProtected) {
+				socket.emit('passwordCheckResult', { 
+					success: true, 
+					message: 'No password required' 
+				});
+				return;
+			}
+			
+			const passwordMatches = password === board.password;
+			
+			if (passwordMatches) {
+				// Add to authorized users
+				if (!rooms[roomId]) {
+					rooms[roomId] = { users: {}, authorizedUsers: [] };
+				}
+				
+				if (!rooms[roomId].authorizedUsers) {
+					rooms[roomId].authorizedUsers = [];
+				}
+				
+				rooms[roomId].authorizedUsers.push(socket.id);
+				
+				socket.emit('passwordCheckResult', { 
+					success: true, 
+					message: 'Password correct' 
+				});
+			} else {
+				socket.emit('passwordCheckResult', { 
+					success: false, 
+					message: 'Incorrect password' 
+				});
+			}
+		} catch (error) {
+			console.error('Error checking room password:', error);
+			socket.emit('passwordCheckResult', { 
+				success: false, 
+				message: 'Error checking password' 
+			});
+		}
+	});
+	
+	// Set room password
+	socket.on('setRoomPassword', async ({ roomId, password }) => {
+		try {
+			// Get board info
+			const board = await Board.findOne({ roomId });
+			
+			if (!board) {
+				socket.emit('error', { message: 'Board not found' });
+				return;
+			}
+			
+			// Update password
+			board.isPasswordProtected = true;
+			board.password = password;
+			await board.save();
+			
+			// Notify other users in the room that the room now requires a password
+			socket.to(roomId).emit('roomPasswordUpdated', true);
+			
+			console.log(`Password set for room: ${roomId}`);
+		} catch (error) {
+			console.error('Error setting room password:', error);
+			socket.emit('error', { message: 'Error setting password' });
+		}
+	});
+	
+	// Remove room password
+	socket.on('removeRoomPassword', async ({ roomId }) => {
+		try {
+			// Get board info
+			const board = await Board.findOne({ roomId });
+			
+			if (!board) {
+				socket.emit('error', { message: 'Board not found' });
+				return;
+			}
+			
+			// Remove password
+			board.isPasswordProtected = false;
+			board.password = '';
+			await board.save();
+			
+			// Clear authorized users list
+			if (rooms[roomId] && rooms[roomId].authorizedUsers) {
+				rooms[roomId].authorizedUsers = [];
+			}
+			
+			// Notify other users in the room
+			socket.to(roomId).emit('roomPasswordUpdated', false);
+			
+			console.log(`Password removed for room: ${roomId}`);
+		} catch (error) {
+			console.error('Error removing room password:', error);
+			socket.emit('error', { message: 'Error removing password' });
+		}
+	});
+
+	// When a user is fully connected to a room
+	socket.on("userReady", async ({ roomId }) => {
+		try {
+			// Get board info from database
+			const boardInfo = await Board.findOne({ roomId });
+			
+			// Send password status
+			if (boardInfo) {
+				socket.emit('roomPasswordStatus', boardInfo.isPasswordProtected);
+				
+				// Send if user is owner
+				const userId = rooms[roomId].users[socket.id].userId;
+				const isOwner = userId && boardInfo.createdBy === userId;
+				socket.emit('userRights', { isOwner });
+			}
+		} catch (error) {
+			console.error("Error in userReady:", error);
+		}
+	});
+	
+	// Handle drawing events - moved out of userReady
 	socket.on("drawEvent", async (data) => {
 		const roomId = socket.roomId;
 
@@ -321,7 +526,7 @@ io.on("connection", (socket) => {
 		}
 	});
 
-	// Handle clear canvas event
+	// Handle clear canvas event - moved out of userReady
 	socket.on("clearCanvas", async () => {
 		const roomId = socket.roomId;
 
