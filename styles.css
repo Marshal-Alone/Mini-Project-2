@@ -673,11 +673,11 @@ input[type="range"]::-moz-range-thumb {
   }
 }
 
-@keyframes underlineAnimation {
+/* @keyframes underlineAnimation {
   to {
     transform: scaleX(1);
   }
-}
+} */
 
 @keyframes wave {
   0% {
