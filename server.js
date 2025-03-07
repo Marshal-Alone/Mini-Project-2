@@ -5,14 +5,10 @@ const User = require("./models/User");
 const mongoose = require("mongoose");
 const { rmSync } = require("fs");
 
-// Connect to MongoDB
+// Connect to MongoDB - Remove deprecated options
 mongoose
 	.connect(
-		"mongodb+srv://trylaptop2024:R4EzWcdNzD9Xf3OW@whiteboard-db.s3oct.mongodb.net/whiteboards",
-		{
-			useNewUrlParser: true,
-			useUnifiedTopology: true,
-		}
+		"mongodb+srv://trylaptop2024:R4EzWcdNzD9Xf3OW@whiteboard-db.s3oct.mongodb.net/whiteboards"
 	)
 	.then(() => {
 		console.log("Connected to MongoDB");
