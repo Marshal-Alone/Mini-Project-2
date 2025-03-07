@@ -2,7 +2,10 @@ require("dotenv").config();
 const express = require("express");
 const path = require("path");
 const User = require("./models/User");
+const Board = require("./models/Board");
 const mongoose = require("mongoose");
+const jwt = require("jsonwebtoken");
+const MonitoringService = require("./utils/monitoring");
 
 // Server timeout
 const SERVER_TIMEOUT = 30000; // 30 seconds
@@ -39,14 +42,31 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname)));
 
-// Health check endpoint
-app.get("/health", (req, res) => {
-	const dbStatus = mongoose.connection.readyState === 1;
-	res.status(dbStatus ? 200 : 503).json({
-		status: dbStatus ? "healthy" : "unhealthy",
-		timestamp: new Date().toISOString(),
-		database: dbStatus ? "connected" : "disconnected",
+// Middleware to verify JWT token
+const verifyToken = (req, res, next) => {
+	const token = req.headers.authorization?.split(" ")[1];
+	if (!token) {
+		return res.status(401).json({ error: "Unauthorized", message: "No token provided" });
+	}
+
+	jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+		if (err) {
+			return res.status(403).json({ error: "Forbidden", message: "Invalid token" });
+		}
+		req.userId = decoded.id;
+		next();
 	});
+};
+
+// Health check endpoint
+app.get("/health", async (req, res) => {
+	try {
+		const health = await MonitoringService.checkHealth();
+		res.status(health.status === "healthy" ? 200 : 503).json(health);
+	} catch (error) {
+		console.error("Health check failed:", error);
+		res.status(500).json({ status: "unhealthy", error: "Health check failed" });
+	}
 });
 
 // Enhanced error handling middleware
@@ -108,8 +128,13 @@ app.post("/api/register", async (req, res) => {
 			return res.status(400).json({ error: "User already exists" });
 		}
 		const user = await User.create({ fullName, email, password });
+
+		// Create and assign a token
+		const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
+
 		res.status(201).json({
 			user: { id: user._id, name: user.fullName, email: user.email },
+			token: token,
 		});
 	} catch (error) {
 		console.error("Registration error:", error);
@@ -124,12 +149,22 @@ app.post("/api/login", async (req, res) => {
 			return res.status(400).json({ error: "Email and password are required" });
 		}
 		const user = await User.findOne({ email });
-		if (!user || password !== user.password) {
+		if (!user) {
 			return res.status(401).json({ error: "Invalid credentials" });
 		}
+
+		// Basic password check (replace with bcrypt for production)
+		if (password !== user.password) {
+			return res.status(401).json({ error: "Invalid credentials" });
+		}
+
+		// Create and assign a token
+		const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
+
 		res.status(200).json({
 			success: true,
 			user: { id: user._id, name: user.fullName, email: user.email },
+			token: token,
 		});
 	} catch (error) {
 		console.error("Login error:", error);
@@ -137,59 +172,30 @@ app.post("/api/login", async (req, res) => {
 	}
 });
 
-// API route to get user info
-app.get("/api/user", async (req, res) => {
+// API route to get user info (protected)
+app.get("/api/user", verifyToken, async (req, res) => {
 	try {
-		const token = req.headers.authorization?.split(" ")[1];
-		if (!token) {
-			return res.status(401).json({ error: "Unauthorized" });
-		}
-
-		// Verify token (replace 'your-jwt-secret-key' with your actual secret)
-		// const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-		// Fetch user from database (replace User.findById with your actual method)
-		// const user = await User.findById(decoded.userId);
-
-		// Mock user data for now
-		const user = {
-			id: "someUserId",
-			name: "Vaishnavi",
-			email: "test@example.com",
-		};
-
+		const user = await User.findById(req.userId);
 		if (!user) {
 			return res.status(404).json({ error: "User not found" });
 		}
-
-		res.status(200).json({ user });
+		res.status(200).json({ user: { id: user._id, name: user.fullName, email: user.email } });
 	} catch (error) {
 		console.error("Get user error:", error);
 		res.status(500).json({ error: "Failed to get user" });
 	}
 });
 
-// API route to create a new board
-app.post("/api/boards", async (req, res) => {
+// API route to create a new board (protected)
+app.post("/api/boards", verifyToken, async (req, res) => {
 	try {
 		const { name } = req.body;
-		// const userId = req.user.id; // Assuming you have middleware to authenticate user
+		const userId = req.userId;
 
-		// Mock user ID for now
-		const userId = "someUserId";
-
-		// Create board in database (replace Board.create with your actual method)
-		// const board = await Board.create({ name, owner: userId });
-
-		// Mock board data for now
-		const board = {
-			id: "someBoardId",
-			name: name,
-			owner: userId,
-		};
+		const board = await Board.create({ name, owner: userId });
 
 		res.status(201).json({
-			roomId: board.id,
+			roomId: board._id,
 			name: board.name,
 		});
 	} catch (error) {
@@ -203,21 +209,14 @@ app.get("/api/boards/code/:code", async (req, res) => {
 	try {
 		const { code } = req.params;
 
-		// Find board in database (replace Board.findOne with your actual method)
-		// const board = await Board.findOne({ code });
-
-		// Mock board data for now
-		const board = {
-			id: "someBoardId",
-			name: "Sample Board",
-		};
+		const board = await Board.findOne({ code });
 
 		if (!board) {
 			return res.status(404).json({ error: "Board not found" });
 		}
 
 		res.status(200).json({
-			roomId: board.id,
+			roomId: board._id,
 			name: board.name,
 		});
 	} catch (error) {
