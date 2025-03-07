@@ -10,6 +10,10 @@ const MonitoringService = require("./utils/monitoring");
 // Server timeout
 const SERVER_TIMEOUT = 30000; // 30 seconds
 
+// Log environment variables
+console.log("JWT_SECRET:", process.env.JWT_SECRET ? "Set" : "Not set");
+console.log("MONGODB_URI:", process.env.MONGODB_URI ? "Set" : "Not set");
+
 // Connect to MongoDB with timeout
 mongoose
 	.connect(process.env.MONGODB_URI, {
@@ -40,6 +44,8 @@ app.use((req, res, next) => {
 // Updated middleware configuration
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve static files from the root directory
 app.use(express.static(path.join(__dirname)));
 
 // Middleware to verify JWT token
@@ -78,6 +84,7 @@ app.use((err, req, res, next) => {
 
 	// Handle different types of errors
 	if (err instanceof mongoose.Error) {
+		console.error("Mongoose error:", err); // Log the full Mongoose error
 		return res.status(503).json({
 			error: "Database error",
 			message: "Service temporarily unavailable",
@@ -86,6 +93,7 @@ app.use((err, req, res, next) => {
 	}
 
 	if (err.type === "entity.parse.failed") {
+		console.error("Parse error:", err); // Log parse errors
 		return res.status(400).json({
 			error: "Invalid request format",
 			message: "Could not parse request data",
@@ -234,7 +242,7 @@ app.use((req, res) => {
 	});
 });
 
-const PORT = process.env.PORT || 5050;
+const PORT = process.env.PORT || 8080; // Use Railway's PORT env variable
 const server = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
 // Add proper server shutdown
