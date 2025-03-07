@@ -400,7 +400,7 @@ h1 {
 
 .social-login p {
   font-size: 0.875rem;
-  color: var(--text-light);
+  color: var (--text-light);
   margin-bottom: 1rem;
   position: relative;
 }
@@ -612,108 +612,6 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .welcome-message {
-  font-size: 2rem;
-  margin-bottom: 2rem;
-  color: var(--primary-color);
-  animation: fadeInDown 0.8s ease-out;
-  display: inline-flex;
-  align-items: center;
-  background: rgba(99, 102, 241, 0.1);
-  padding: 1rem 1.5rem;
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-md);
-  border: 2px solid rgba(99, 102, 241, 0.2);
-}
-
-.greeting {
-  font-weight: 500;
-  margin-right: 0.5rem;
-}
-
-.user-name {
-  font-weight: 800;
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  position: relative;
-  padding-bottom: 2px;
-}
-
-.user-name::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-  transform: scaleX(0);
-  transform-origin: left;
-  animation: underlineAnimation 0.8s ease-out forwards;
-  animation-delay: 0.5s;
-}
-
-.welcome-emoji {
-  font-size: 2rem;
-  margin-left: 0.75rem;
-  animation: wave 1.5s infinite;
-  display: inline-block;
-  transform-origin: 70% 70%;
-}
-
-@keyframes fadeInDown {
-  from {
-    opacity: 0;
-    transform: translateY(-30px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* @keyframes underlineAnimation {
-  to {
-    transform: scaleX(1);
-  }
-} */
-
-@keyframes wave {
-  0% {
-    transform: rotate(0deg);
-  }
-
-  10% {
-    transform: rotate(14deg);
-  }
-
-  20% {
-    transform: rotate(-8deg);
-  }
-
-  30% {
-    transform: rotate(14deg);
-  }
-
-  40% {
-    transform: rotate(-4deg);
-  }
-
-  50% {
-    transform: rotate(10deg);
-  }
-
-  60% {
-    transform: rotate(0deg);
-  }
-
-  100% {
-    transform: rotate(0deg);
-  }
-}
-
-.welcome-message {
   font-size: 1.5rem;
   margin-bottom: 1.5rem;
   color: var(--primary-color);
@@ -729,6 +627,10 @@ input[type="range"]::-moz-range-thumb {
   background: linear-gradient(120deg, var(--primary-color), var(--primary-hover));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  margin-left: 0.5rem;
+}
+
+.welcome-emoji {
   margin-left: 0.5rem;
 }
 

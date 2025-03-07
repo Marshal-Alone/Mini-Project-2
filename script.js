@@ -22,25 +22,16 @@ document.addEventListener("DOMContentLoaded", function () {
 	// Update UI based on auth status user auth
 	const updateAuthUI = (user) => {
 		const authLinks = document.querySelector(".nav-links");
-		const welcomeMessage = document.querySelector(".welcome-message");
 
 		if (authLinks) {
 			if (user) {
-				// Update nav links
 				authLinks.innerHTML = `
           <a href="#features">Features</a>
+          <!-- <a href="#pricing">Pricing</a> -->
           <a href="#about">About</a>
+          <span class="user-greeting">Hello, ${user.name}</span>
           <button id="logoutBtn" class="btn btn-outline">Log out</button>
         `;
-
-				// Update welcome message if it exists
-				if (welcomeMessage) {
-					welcomeMessage.innerHTML = `
-            <span class="greeting">Hello,</span>
-            <span class="user-name">${user.name}</span>
-            <span class="welcome-emoji">👋</span>
-          `;
-				}
 
 				// Add logout handler
 				document.getElementById("logoutBtn").addEventListener("click", async () => {
@@ -56,50 +47,20 @@ document.addEventListener("DOMContentLoaded", function () {
 			} else {
 				authLinks.innerHTML = `
           <a href="#features">Features</a>
+          <!-- <a href="#pricing">Pricing</a> -->
           <a href="#about">About</a>
           <a href="/login" class="btn btn-outline">Log in</a>
           <a href="/register" class="btn btn-primary">Sign up</a>
         `;
-
-				// Set default welcome message if not logged in
-				if (welcomeMessage) {
-					welcomeMessage.innerHTML = `
-            <span class="greeting">Hello,</span>
-            <span class="user-name">Guest</span>
-            <span class="welcome-emoji">👋</span>
-          `;
-				}
 			}
 		}
 	};
-
-	// Initial welcome message update
-	const welcomeMessage = document.querySelector(".welcome-message");
-	if (welcomeMessage) {
-		// Try to get stored user data
-		const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-		const userName = storedUser.name || storedUser.fullName || "Guest";
-
-		welcomeMessage.innerHTML = `
-      <span class="greeting">Hello,</span>
-      <span class="user-name">${userName}</span>
-      <span class="welcome-emoji">👋</span>
-    `;
-	}
 
 	// Check auth on page load
 	checkAuth().then((user) => {
 		if (user) {
 			localStorage.setItem("user", JSON.stringify(user));
 			updateAuthUI(user);
-			// Update welcome message with authenticated user's name
-			if (welcomeMessage) {
-				welcomeMessage.innerHTML = `
-          <span class="greeting">Hello,</span>
-          <span class="user-name">${user.name || user.fullName}</span>
-          <span class="welcome-emoji">👋</span>
-        `;
-			}
 		}
 	});
 
