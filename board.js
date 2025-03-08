@@ -903,20 +903,23 @@ document.addEventListener('DOMContentLoaded', function() {
   socket.on('connect', () => {
     console.log('Connected to server with socket ID:', socket.id);
     
-    const connectionStatus = document.getElementById('connectionStatus');
-    connectionStatus.innerHTML = '<i class="fas fa-circle connected"></i> Connected';
-    connectionStatus.classList.add('connected');
-    connectionStatus.classList.remove('disconnected');
+    // Get the user name before joining the room
+    const userName = promptForUserName();
+    const user = getUserInfo();
+    const userId = user ? user.id : null;
     
-    // If we were previously connected and have a room ID, rejoin
-    if (roomId && userName) {
-      const user = getUserInfo();
-      socket.emit('joinRoom', { 
-        roomId, 
-        userName,
-        userId: user ? user.id : null
-      });
-    }
+    // Check if we have local authentication for this room
+    const hasLocalAuth = localStorage.getItem(`board_auth_${roomId}`) === 'true';
+    const storedUserId = localStorage.getItem(`board_user_${roomId}`);
+    
+    // Emit joinRoom with the user name
+    socket.emit('joinRoom', {
+        roomId,
+        userName,  // Use the retrieved user name
+        userId,
+        password: null,
+        hasLocalAuth: hasLocalAuth || (userId && storedUserId === userId)
+    });
   });
   
   socket.on('disconnect', () => {
@@ -928,6 +931,18 @@ document.addEventListener('DOMContentLoaded', function() {
     connectionStatus.classList.add('disconnected');
     
     showToast('Disconnected from server. Trying to reconnect...');
+  });
+
+  // Add this new event handler for reconnect
+  socket.on('reconnect', () => {
+    console.log('Reconnected to server');
+    
+    const connectionStatus = document.getElementById('connectionStatus');
+    connectionStatus.innerHTML = '<i class="fas fa-circle connected"></i> Connected';
+    connectionStatus.classList.remove('disconnected');
+    connectionStatus.classList.add('connected');
+    
+    showToast('Reconnected to server', 'success');
   });
   
   // Add this error handling code near the socket events
