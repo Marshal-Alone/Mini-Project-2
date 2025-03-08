@@ -687,6 +687,8 @@ function findAndKillProcessOnPort(port) {
 	});
 }
 
+
+
 // Start server with port checking - improved version
 async function startServer() {
 	let inUse = await isPortInUse(PORT);
