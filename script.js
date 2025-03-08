@@ -22,6 +22,11 @@ document.addEventListener('DOMContentLoaded', function() {
   // Update UI based on auth status
   const updateAuthUI = (user) => {
     const authLinks = document.querySelector('.nav-links');
+    const userNameDisplay = document.getElementById('userNameDisplay');
+    
+    if (userNameDisplay) {
+      userNameDisplay.textContent = user ? user.name : 'Guest';
+    }
     
     if (authLinks) {
       if (user) {
@@ -29,7 +34,9 @@ document.addEventListener('DOMContentLoaded', function() {
           <a href="#features">Features</a>
           <a href="#pricing">Pricing</a>
           <a href="#about">About</a>
-          <span class="user-greeting">Hello, ${user.name}</span>
+          <span style="font-size: 1.2rem; font-weight: bold;" class="user-greeting" title="Logged in as ${user.email || ''}">
+            ${user.name}
+          </span>
           <button id="logoutBtn" class="btn btn-outline">Log out</button>
         `;
         
