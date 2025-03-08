@@ -23,9 +23,15 @@ document.addEventListener('DOMContentLoaded', function() {
   const updateAuthUI = (user) => {
     const authLinks = document.querySelector('.nav-links');
     const userNameDisplay = document.getElementById('userNameDisplay');
+    const welcomeMessageContainer = document.getElementById('welcomeMessageContainer');
     
-    if (userNameDisplay) {
-      userNameDisplay.textContent = user ? user.name : 'Guest';
+    // Show/hide welcome message based on user login status
+    if (welcomeMessageContainer) {
+      welcomeMessageContainer.style.display = user ? 'block' : 'none';
+    }
+    
+    if (userNameDisplay && user) {
+      userNameDisplay.textContent = user.name;
     }
     
     if (authLinks) {
