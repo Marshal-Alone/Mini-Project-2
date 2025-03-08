@@ -204,4 +204,165 @@
       <input type="range" id="brushOpacity" min="0" max="100" value="100">
     </div>
   </body>
+
+  <script>
+    // Direct DOM manipulation to ensure users appear with enhanced UI
+  async function ensureUsersExist() {
+    const usersList = document.getElementById('usersList');
+    if (usersList && usersList.children.length === 0) {
+      console.log("Adding users with enhanced UI");
+
+      // Add some styling to the users list
+      usersList.style.padding = '8px';
+
+      const users = [
+        // load users from the database
+      ];
+      
+      //load users from the database and store into users array 
+       users = await User.find({ roomId: roomId });
+      users.forEach(user => {
+        const userItem = document.createElement('div');
+        userItem.className = 'user-item';
+        userItem.style.display = 'flex';
+        userItem.style.alignItems = 'center';
+        userItem.style.gap = '12px';
+        userItem.style.padding = '12px 16px';
+        userItem.style.margin = '0 0 10px 0';
+        userItem.style.backgroundColor = 'white';
+        userItem.style.boxShadow = '0 2px 6px rgba(0,0,0,0.08)';
+        userItem.style.borderRadius = '8px';
+        userItem.style.transition = 'transform 0.2s, box-shadow 0.2s';
+
+        // Add hover effect
+        userItem.addEventListener('mouseenter', () => {
+          userItem.style.transform = 'translateY(-2px)';
+          userItem.style.boxShadow = '0 4px 12px rgba(0,0,0,0.12)';
+        });
+
+        userItem.addEventListener('mouseleave', () => {
+          userItem.style.transform = 'translateY(0)';
+          userItem.style.boxShadow = '0 2px 6px rgba(0,0,0,0.08)';
+        });
+
+        const initial = user.name.charAt(0);
+
+        // Create avatar with enhanced styling
+        const avatarContainer = document.createElement('div');
+        avatarContainer.className = 'user-avatar';
+        avatarContainer.style.width = '40px';
+        avatarContainer.style.height = '40px';
+        avatarContainer.style.backgroundColor = user.color;
+        avatarContainer.style.color = 'white';
+        avatarContainer.style.fontWeight = 'bold';
+        avatarContainer.style.fontSize = '16px';
+        avatarContainer.style.display = 'flex';
+        avatarContainer.style.alignItems = 'center';
+        avatarContainer.style.justifyContent = 'center';
+        avatarContainer.style.borderRadius = '50%';
+
+        // Add glow effect for current user
+        if (user.isCurrentUser) {
+          avatarContainer.style.boxShadow = `0 0 0 2px white, 0 0 0 4px ${user.color}`;
+        }
+
+        const avatarInitial = document.createElement('span');
+        avatarInitial.textContent = initial;
+        avatarContainer.appendChild(avatarInitial);
+
+        // Create user info container
+        const userInfo = document.createElement('div');
+        userInfo.className = 'user-info';
+        userInfo.style.flexGrow = '1';
+
+        // Create user name
+        const userName = document.createElement('div');
+        userName.className = 'user-name';
+        userName.style.fontWeight = 'bold';
+        userName.style.fontSize = '14px';
+        userName.style.color = '#333';
+        userName.style.marginBottom = '4px';
+        userName.textContent = user.name;
+
+        // Add "(You)" badge for current user
+        if (user.isCurrentUser) {
+          const youBadge = document.createElement('span');
+          youBadge.textContent = ' (You)';
+          // youBadge.style.backgroundColor = '#e0e7ff';
+          youBadge.style.color = '#4f46e5';
+          youBadge.style.padding = '2px 6px';
+          youBadge.style.borderRadius = '10px';
+          youBadge.style.fontSize = '10px';
+          youBadge.style.marginLeft = '6px';
+          userName.appendChild(youBadge);
+        }
+
+        userInfo.appendChild(userName);
+
+        // Create status with colored indicator
+        const userStatus = document.createElement('div');
+        userStatus.className = 'user-status';
+        userStatus.style.display = 'flex';
+        userStatus.style.alignItems = 'center';
+        userStatus.style.fontSize = '12px';
+        userStatus.style.color = '#666';
+
+        const statusIndicator = document.createElement('span');
+        statusIndicator.style.width = '8px';
+        statusIndicator.style.height = '8px';
+        statusIndicator.style.borderRadius = '50%';
+        statusIndicator.style.backgroundColor = user.statusColor;
+        statusIndicator.style.marginRight = '6px';
+        statusIndicator.style.display = 'inline-block';
+
+        userStatus.appendChild(statusIndicator);
+        userStatus.appendChild(document.createTextNode(user.status));
+        userInfo.appendChild(userStatus);
+
+        // Add all elements to the user item
+        userItem.appendChild(avatarContainer);
+        userItem.appendChild(userInfo);
+
+        usersList.appendChild(userItem);
+      });
+
+      // Style the panel content area
+      const panelContent = document.querySelector('.panel-content');
+      if (panelContent) {
+        panelContent.style.padding = '12px';
+        panelContent.style.backgroundColor = '#f8f9fa';
+      }
+
+      // Enhance the invite button
+      const inviteBtn = document.getElementById('inviteUser');
+      if (inviteBtn) {
+        inviteBtn.style.width = '100%';
+        inviteBtn.style.padding = '10px';
+        inviteBtn.style.borderRadius = '6px';
+        inviteBtn.style.fontWeight = '500';
+        inviteBtn.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+        inviteBtn.style.transition = 'transform 0.2s';
+
+        inviteBtn.addEventListener('mouseenter', () => {
+          inviteBtn.style.transform = 'translateY(-2px)';
+        });
+
+        inviteBtn.addEventListener('mouseleave', () => {
+          inviteBtn.style.transform = 'translateY(0)';
+        });
+      }
+
+      // Enhance the panel header
+      const panelHeader = document.querySelector('.panel-header');
+      if (panelHeader) {
+        panelHeader.style.background = 'linear-gradient(135deg, #4a6ee0, #8a56e0)';
+        panelHeader.style.padding = '14px 16px';
+        panelHeader.style.borderRadius = '8px 0 0 0';
+      }
+    }
+  }
+
+  // Try immediately
+  </script>
+
 </html>
