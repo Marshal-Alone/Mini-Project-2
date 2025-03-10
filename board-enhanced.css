@@ -370,7 +370,7 @@ body.board-page {
   transform: translateX(0);
   transition: transform 0.3s ease, width 0.3s ease;
   z-index: 90;
-  height: calc(100vh - 130px);
+  /* height: calc(100vh - 130px); */
   display: flex;
   flex-direction: column;
 
