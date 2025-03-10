@@ -4,15 +4,12 @@ const path = require("path");
 const User = require("./models/User");
 const mongoose = require("mongoose");
 const { rmSync } = require("fs");
+const { Server } = require("socket.io");
 
 // Connect to MongoDB
 mongoose
 	.connect(
-		"mongodb+srv://trylaptop2024:R4EzWcdNzD9Xf3OW@whiteboard-db.s3oct.mongodb.net/whiteboards",
-		{
-			useNewUrlParser: true,
-			useUnifiedTopology: true,
-		}
+		"mongodb+srv://trylaptop2024:R4EzWcdNzD9Xf3OW@whiteboard-db.s3oct.mongodb.net/whiteboards"
 	)
 	.then(() => {
 		console.log("Connected to MongoDB");
@@ -86,4 +83,15 @@ app.get("/register", (req, res) => res.render("index.html"));
 // app.get("/register", (req, res) => res.sendFile(path.join(__dirname, "register.html")));
 
 const PORT = process.env.PORT || 5050;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+const server = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+// Initialize Socket.IO
+const io = new Server(server);
+
+io.on("connection", (socket) => {
+	console.log("a user connected");
+
+	socket.on("disconnect", () => {
+		console.log("user disconnected");
+	});
+});

@@ -97,6 +97,8 @@ document.addEventListener("DOMContentLoaded", function () {
 	const startBoardingButton = document.getElementById("startBoarding");
 
 	if (roomNameInput && startBoardingButton) {
+		
+
 		// Set initial placeholder
 		roomNameInput.placeholder = "Enter your room name...";
 
@@ -117,6 +119,8 @@ document.addEventListener("DOMContentLoaded", function () {
 		}, 3000); // Start changing after 3 seconds
 
 		startBoardingButton.addEventListener("click", async () => {
+			//redirect to board.html
+		window.location.href = 'board.html';
 			let roomName = roomNameInput.value.trim();
 
 			// If no room name is provided, generate a random one
@@ -170,7 +174,9 @@ document.addEventListener("DOMContentLoaded", function () {
 							data.roomId
 						)}&name=${encodeURIComponent(roomName)}`;
 					} else {
-						alert("Failed to create board. Please try again.");
+						//redirect to board.html
+		window.location.href = 'board.html';
+						// alert("Failed to create board. Please try again.");
 					}
 				} catch (error) {
 					console.error("Board creation error:", error);
