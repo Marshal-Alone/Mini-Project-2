@@ -71,16 +71,9 @@ app.post("/api/login", async (req, res) => {
 
 // Basic routes
 app.get("/", (req, res) => res.sendFile(path.join(__dirname, "index.html")));
-// app.get("/board", (req, res) => res.sendFile(path.join(__dirname, "board.html")));
-app.get("/board", (req, res) =>
-	res.redirect(
-		"http://localhost:5050/board.html?room=xn2q1s4onzh&name=Enter%20your%20room%20name..."
-	)
-);
-rmSync;
-app.get("/login", (req, res) => res.render("index.html")); // app.get("/login", (req, res) => res.sendFile(path.join(__dirname, "login.html")));
-app.get("/register", (req, res) => res.render("index.html"));
-// app.get("/register", (req, res) => res.sendFile(path.join(__dirname, "register.html")));
+app.get("/board", (req, res) => res.sendFile(path.join(__dirname, "board.html")));
+app.get("/login", (req, res) => res.sendFile(path.join(__dirname, "login.html")));
+app.get("/register", (req, res) => res.sendFile(path.join(__dirname, "register.html")));
 
 const PORT = process.env.PORT || 5050;
 const server = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
@@ -88,10 +81,67 @@ const server = app.listen(PORT, () => console.log(`Server running on port ${PORT
 // Initialize Socket.IO
 const io = new Server(server);
 
+// Track active rooms and users
+const rooms = new Map();
+
 io.on("connection", (socket) => {
 	console.log("a user connected");
 
+	// Handle room joining
+	socket.on("joinRoom", ({ roomId, userName, userId }) => {
+		socket.join(roomId);
+
+		// Initialize room if it doesn't exist
+		if (!rooms.has(roomId)) {
+			rooms.set(roomId, {
+				users: new Map(),
+				password: null,
+			});
+		}
+
+		const room = rooms.get(roomId);
+		room.users.set(socket.id, { userName, userId });
+
+		// Notify others in the room
+		socket.to(roomId).emit("userJoined", { userName });
+
+		// Send current room state to new user
+		socket.emit("roomData", {
+			users: Array.from(room.users.values()),
+			isOwner: room.users.size === 1,
+		});
+	});
+
+	// Handle share event
+	socket.on("shareBoard", ({ roomId }) => {
+		const room = rooms.get(roomId);
+		if (room) {
+			const shareLink = `${process.env.BASE_URL}/board?room=${roomId}`;
+			socket.emit("shareLink", { shareLink });
+		}
+	});
+
+	// Handle save event
+	socket.on("saveBoard", ({ roomId, dataUrl }) => {
+		// Here you would implement actual saving logic
+		// For now, just acknowledge the save
+		socket.emit("boardSaved", { success: true });
+	});
+
+	// Handle disconnect
 	socket.on("disconnect", () => {
-		console.log("user disconnected");
+		// Remove user from all rooms
+		rooms.forEach((room, roomId) => {
+			if (room.users.has(socket.id)) {
+				room.users.delete(socket.id);
+				if (room.users.size === 0) {
+					rooms.delete(roomId);
+				} else {
+					io.to(roomId).emit("userLeft", {
+						userName: room.users.get(socket.id).userName,
+					});
+				}
+			}
+		});
 	});
 });
