@@ -670,3 +670,9 @@ function showToast(message, type = 'info') {
     transform: translateX(170px);
   }
 }
+
+.users-panel {
+  position: absolute;
+  right: -10px;
+  top: 250px;
+}
