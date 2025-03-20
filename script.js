@@ -2,9 +2,12 @@ document.addEventListener("DOMContentLoaded", function () {
 	// Check if user is logged in
 	const checkAuth = async () => {
 		try {
+			const token = localStorage.getItem("token");
+			if (!token) return null;
+
 			const response = await fetch("/api/user", {
 				headers: {
-					Authorization: `Bearer ${localStorage.getItem("token")}`,
+					Authorization: `Bearer ${token}`,
 				},
 			});
 
@@ -36,16 +39,16 @@ document.addEventListener("DOMContentLoaded", function () {
 		if (authLinks) {
 			if (user) {
 				authLinks.innerHTML = `
-          <a href="#features">Features</a>
-          <a href="#pricing">Pricing</a>
-          <a href="#about">About</a>
-          <span style="font-size: 1.2rem; font-weight: bold;" class="user-greeting" title="Logged in as ${
-						user.email || ""
-					}">
-            ${user.name}
-          </span>
-          <button id="logoutBtn" class="btn btn-outline">Log out</button>
-        `;
+                    <a href="#features">Features</a>
+                    <a href="#pricing">Pricing</a>
+                    <a href="#about">About</a>
+                    <span style="font-size: 1.2rem; font-weight: bold;" class="user-greeting" title="Logged in as ${
+											user.email || ""
+										}">
+                        ${user.name}
+                    </span>
+                    <button id="logoutBtn" class="btn btn-outline">Log out</button>
+                `;
 
 				// Add logout handler
 				document.getElementById("logoutBtn").addEventListener("click", async () => {
@@ -60,23 +63,15 @@ document.addEventListener("DOMContentLoaded", function () {
 				});
 			} else {
 				authLinks.innerHTML = `
-          <a href="#features">Features</a>
-          <a href="#pricing">Pricing</a>
-          <a href="#about">About</a>
-          <a href="/login" class="btn btn-outline">Log in</a>
-          <a href="/register" class="btn btn-primary">Sign up</a>
-        `;
+                    <a href="#features">Features</a>
+                    <a href="#pricing">Pricing</a>
+                    <a href="#about">About</a>
+                    <a href="auth.html?tab=login" class="btn btn-outline">Log in</a>
+                    <a href="auth.html?tab=register" class="btn btn-primary">Sign up</a>
+                `;
 			}
 		}
 	};
-
-	// Check auth on page load
-	checkAuth().then((user) => {
-		if (user) {
-			localStorage.setItem("user", JSON.stringify(user));
-		}
-		updateAuthUI(user);
-	});
 
 	// Generate random room name
 	const generateRandomName = () => {
@@ -135,31 +130,25 @@ document.addEventListener("DOMContentLoaded", function () {
 
 			// If no room name is provided, generate a random one
 			if (!roomName) {
-				roomName = roomNameInput.placeholder.replace("e.g. ", ""); // Get the random name
+				roomName = roomNameInput.placeholder.replace("e.g. ", "");
 			}
 
-			// Check if the entered name is a 6-digit code (all numbers, exactly 6 digits)
+			// Check if the entered name is a 6-digit code
 			const isBoardCode = /^\d{6}$/.test(roomName);
 
 			// If it's a board code, try to find the corresponding board
 			if (isBoardCode) {
 				try {
-					// Call API to find board by code
 					const response = await fetch(`/api/boards/code/${roomName}`);
-
 					if (response.ok) {
 						const data = await response.json();
-
-						// Redirect to the existing board
 						window.location.href = `/board?room=${encodeURIComponent(
 							data.roomId
 						)}&name=${encodeURIComponent(data.name)}`;
-						return; // Exit function early
+						return;
 					}
-					// If not found or error, continue to create a new board
 				} catch (error) {
 					console.log("Error finding board by code:", error);
-					// Continue with board creation
 				}
 			}
 
@@ -179,7 +168,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
 					if (response.ok) {
 						const data = await response.json();
-						// Pass room ID as a query parameter
 						window.location.href = `/board?room=${encodeURIComponent(
 							data.roomId
 						)}&name=${encodeURIComponent(roomName)}`;
@@ -193,7 +181,6 @@ document.addEventListener("DOMContentLoaded", function () {
 			} else {
 				// Just redirect to a new room if not logged in
 				const roomId = Math.random().toString(36).substring(2, 15);
-				// Pass room name as a query parameter
 				window.location.href = `/board?room=${encodeURIComponent(roomId)}&name=${encodeURIComponent(
 					roomName
 				)}`;
@@ -207,7 +194,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		loginForm.addEventListener("submit", async (e) => {
 			e.preventDefault();
 			const email = document.getElementById("email").value;
-			const password = document.getElementById("password").value;
+			const password = document.getElementById("l-password").value;
 
 			try {
 				const response = await fetch("/api/login", {
@@ -225,11 +212,26 @@ document.addEventListener("DOMContentLoaded", function () {
 					localStorage.setItem("user", JSON.stringify(data.user));
 					window.location.href = "/";
 				} else {
-					alert(data.error || "Login failed. Please check your credentials.");
+					// Handle 400 Bad Request and other errors
+					const errorDiv = document.getElementById("loginError");
+					if (errorDiv) {
+						errorDiv.textContent = data.message || data.error || "Invalid email or password";
+						errorDiv.classList.add("visible");
+						setTimeout(() => {
+							errorDiv.classList.remove("visible");
+						}, 5000);
+					}
 				}
 			} catch (error) {
 				console.error("Login error:", error);
-				alert("Login failed. Please try again.");
+				const errorDiv = document.getElementById("loginError");
+				if (errorDiv) {
+					errorDiv.textContent = "Login failed. Please check your credentials and try again.";
+					errorDiv.classList.add("visible");
+					setTimeout(() => {
+						errorDiv.classList.remove("visible");
+					}, 5000);
+				}
 			}
 		});
 	}
@@ -239,14 +241,13 @@ document.addEventListener("DOMContentLoaded", function () {
 	if (registerForm) {
 		registerForm.addEventListener("submit", async (e) => {
 			e.preventDefault();
-			const fullName = document.getElementById("fullName").value;
-			const email = document.getElementById("email").value;
-			const password = document.getElementById("password").value;
-			const confirmPassword = document.getElementById("confirmPassword").value;
+			const fullName = document.getElementById("fullName")?.value;
+			const email = document.getElementById("email")?.value;
+			const password = document.getElementById("password")?.value;
 
 			// Simple validation
-			if (password !== confirmPassword) {
-				alert("Passwords do not match!");
+			if (!fullName || !email || !password) {
+				alert("Please fill out all fields");
 				return;
 			}
 
@@ -279,4 +280,12 @@ document.addEventListener("DOMContentLoaded", function () {
 			}
 		});
 	}
+
+	// Check auth on page load
+	checkAuth().then((user) => {
+		if (user) {
+			localStorage.setItem("user", JSON.stringify(user));
+		}
+		updateAuthUI(user);
+	});
 });

@@ -12,20 +12,21 @@ const connectDB = require("./config/db");
 const User = require("./models/User");
 const Board = require("./models/Board");
 const bcrypt = require("bcryptjs");
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 // Connect to MongoDB
 connectDB();
 
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/collaboard', {
-	useNewUrlParser: true,
-	useUnifiedTopology: true
-})
-.then(() =>{ 
-	console.log('');
-	console.log('Connected to MongoDB')
-})
-.catch(err => console.error('Could not connect to MongoDB', err));
+mongoose
+	.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/collaboard", {
+		useNewUrlParser: true,
+		useUnifiedTopology: true,
+	})
+	.then(() => {
+		console.log("");
+		console.log("Connected to MongoDB");
+	})
+	.catch((err) => console.error("Could not connect to MongoDB", err));
 
 const app = express();
 const server = http.createServer(app);
@@ -121,11 +122,11 @@ app.post("/api/login", async (req, res) => {
 
 		console.log("\n=== Login attempt ===");
 		console.log("Email:", email);
-		
+
 		// Get user
 		const user = await User.findOne({ email });
 		console.log("User found:", user ? "Yes" : "No");
-		
+
 		if (!user) {
 			return res.status(400).json({ error: "Invalid email or password" });
 		}
@@ -133,12 +134,12 @@ app.post("/api/login", async (req, res) => {
 		console.log("User ID:", user._id);
 		console.log("Input password:", password);
 		console.log("Stored hash:", user.password);
-		
+
 		// Check password
 		const validPassword = await bcrypt.compare(password, user.password);
 		console.log("Password match result:", validPassword);
 		console.log("=== End Login ===\n");
-		
+
 		if (!validPassword) {
 			return res.status(400).json({ error: "Invalid email or password" });
 		}
@@ -225,32 +226,32 @@ app.get("/api/boards", authenticateToken, async (req, res) => {
 app.get("/api/boards/code/:code", async (req, res) => {
 	try {
 		const { code } = req.params;
-		
+
 		// Get all boards (ideally you would have a more efficient lookup)
 		const boards = await Board.find({});
-		
+
 		// Find the board with the matching code
 		// We'll compute the 6-digit code for each board and check for a match
 		for (const board of boards) {
 			// Use the same algorithm as in board.js to generate the code
 			let numericValue = 0;
 			const roomId = board.roomId;
-			
+
 			for (let i = 0; i < roomId.length; i++) {
 				numericValue += roomId.charCodeAt(i);
 			}
-			
-			const boardCode = (numericValue % 900000 + 100000).toString();
-			
+
+			const boardCode = ((numericValue % 900000) + 100000).toString();
+
 			if (boardCode === code) {
 				// Found the matching board
 				return res.status(200).json({
 					roomId: board.roomId,
-					name: board.name
+					name: board.name,
 				});
 			}
 		}
-		
+
 		// If no board found with that code
 		return res.status(404).json({ error: "Board not found" });
 	} catch (error) {
@@ -269,17 +270,17 @@ io.on("connection", (socket) => {
 
 		try {
 			const boardForAuth = await Board.findOne({ roomId });
-			
+
 			if (boardForAuth && boardForAuth.isPasswordProtected) {
 				const isOwner = userId && boardForAuth.createdBy === userId;
 				const isAuthorized = rooms[roomId]?.authorizedUsers?.includes(userId || socket.id);
 
 				if (!isOwner && !isAuthorized && !hasLocalAuth) {
 					if (!password || password !== boardForAuth.password) {
-						socket.emit('passwordRequired', { roomId });
+						socket.emit("passwordRequired", { roomId });
 						return;
 					}
-					
+
 					if (userId) {
 						if (!rooms[roomId]) rooms[roomId] = { users: {}, authorizedUsers: [] };
 						rooms[roomId].authorizedUsers.push(userId);
@@ -291,7 +292,7 @@ io.on("connection", (socket) => {
 			if (!rooms[roomId]) {
 				rooms[roomId] = {
 					users: {},
-					authorizedUsers: []
+					authorizedUsers: [],
 				};
 			}
 
@@ -331,13 +332,13 @@ io.on("connection", (socket) => {
 
 			// Find or create board in the database
 			let board = await Board.findOne({ roomId });
-			
+
 			if (!board) {
 				board = new Board({
 					roomId,
 					name: roomId, // Default name is the roomId
 					history: [],
-					createdBy: userId || socketId
+					createdBy: userId || socketId,
 				});
 				await board.save();
 			}
@@ -345,7 +346,7 @@ io.on("connection", (socket) => {
 			// Send board history from database to the new user
 			socket.emit("roomData", {
 				users: Object.values(rooms[roomId].users),
-				history: board.history
+				history: board.history,
 			});
 
 			// Notify all clients about the new user
@@ -355,118 +356,118 @@ io.on("connection", (socket) => {
 			console.log(`User ${userName} joined room ${roomId}`);
 		} catch (error) {
 			console.error("Error joining room:", error);
-			socket.emit('error', { message: 'Error joining room' });
+			socket.emit("error", { message: "Error joining room" });
 		}
 	});
 
 	// Check password for a room
-	socket.on('checkRoomPassword', async ({ roomId, password }) => {
+	socket.on("checkRoomPassword", async ({ roomId, password }) => {
 		try {
 			const board = await Board.findOne({ roomId });
-			
+
 			if (!board) {
-				socket.emit('passwordCheckResult', { 
-					success: false, 
-					message: 'Room not found' 
+				socket.emit("passwordCheckResult", {
+					success: false,
+					message: "Room not found",
 				});
 				return;
 			}
-			
+
 			if (!board.isPasswordProtected) {
-				socket.emit('passwordCheckResult', { 
-					success: true, 
-					message: 'No password required' 
+				socket.emit("passwordCheckResult", {
+					success: true,
+					message: "No password required",
 				});
 				return;
 			}
-			
+
 			const passwordMatches = password === board.password;
-			
+
 			if (passwordMatches) {
 				// Add to authorized users
 				if (!rooms[roomId]) {
 					rooms[roomId] = { users: {}, authorizedUsers: [] };
 				}
-				
+
 				if (!rooms[roomId].authorizedUsers) {
 					rooms[roomId].authorizedUsers = [];
 				}
-				
+
 				rooms[roomId].authorizedUsers.push(socket.id);
-				
-				socket.emit('passwordCheckResult', { 
-					success: true, 
-					message: 'Password correct' 
+
+				socket.emit("passwordCheckResult", {
+					success: true,
+					message: "Password correct",
 				});
 			} else {
-				socket.emit('passwordCheckResult', { 
-					success: false, 
-					message: 'Incorrect password' 
+				socket.emit("passwordCheckResult", {
+					success: false,
+					message: "Incorrect password",
 				});
 			}
 		} catch (error) {
-			console.error('Error checking room password:', error);
-			socket.emit('passwordCheckResult', { 
-				success: false, 
-				message: 'Error checking password' 
+			console.error("Error checking room password:", error);
+			socket.emit("passwordCheckResult", {
+				success: false,
+				message: "Error checking password",
 			});
 		}
 	});
-	
+
 	// Set room password
-	socket.on('setRoomPassword', async ({ roomId, password }) => {
+	socket.on("setRoomPassword", async ({ roomId, password }) => {
 		try {
 			// Get board info
 			const board = await Board.findOne({ roomId });
-			
+
 			if (!board) {
-				socket.emit('error', { message: 'Board not found' });
+				socket.emit("error", { message: "Board not found" });
 				return;
 			}
-			
+
 			// Update password
 			board.isPasswordProtected = true;
 			board.password = password;
 			await board.save();
-			
+
 			// Notify other users in the room that the room now requires a password
-			socket.to(roomId).emit('roomPasswordUpdated', true);
-			
+			socket.to(roomId).emit("roomPasswordUpdated", true);
+
 			console.log(`Password set for room: ${roomId}`);
 		} catch (error) {
-			console.error('Error setting room password:', error);
-			socket.emit('error', { message: 'Error setting password' });
+			console.error("Error setting room password:", error);
+			socket.emit("error", { message: "Error setting password" });
 		}
 	});
-	
+
 	// Remove room password
-	socket.on('removeRoomPassword', async ({ roomId }) => {
+	socket.on("removeRoomPassword", async ({ roomId }) => {
 		try {
 			// Get board info
 			const board = await Board.findOne({ roomId });
-			
+
 			if (!board) {
-				socket.emit('error', { message: 'Board not found' });
+				socket.emit("error", { message: "Board not found" });
 				return;
 			}
-			
+
 			// Remove password
 			board.isPasswordProtected = false;
-			board.password = '';
+			board.password = "";
 			await board.save();
-			
+
 			// Clear authorized users list
 			if (rooms[roomId] && rooms[roomId].authorizedUsers) {
 				rooms[roomId].authorizedUsers = [];
 			}
-			
+
 			// Notify other users in the room
-			socket.to(roomId).emit('roomPasswordUpdated', false);
-			
+			socket.to(roomId).emit("roomPasswordUpdated", false);
+
 			console.log(`Password removed for room: ${roomId}`);
 		} catch (error) {
-			console.error('Error removing room password:', error);
-			socket.emit('error', { message: 'Error removing password' });
+			console.error("Error removing room password:", error);
+			socket.emit("error", { message: "Error removing password" });
 		}
 	});
 
@@ -475,21 +476,21 @@ io.on("connection", (socket) => {
 		try {
 			// Get board info from database
 			const boardInfo = await Board.findOne({ roomId });
-			
+
 			// Send password status
 			if (boardInfo) {
-				socket.emit('roomPasswordStatus', boardInfo.isPasswordProtected);
-				
+				socket.emit("roomPasswordStatus", boardInfo.isPasswordProtected);
+
 				// Send if user is owner
 				const userId = rooms[roomId].users[socket.id].userId;
 				const isOwner = userId && boardInfo.createdBy === userId;
-				socket.emit('userRights', { isOwner });
+				socket.emit("userRights", { isOwner });
 			}
 		} catch (error) {
 			console.error("Error in userReady:", error);
 		}
 	});
-	
+
 	// Handle drawing events - moved out of userReady
 	socket.on("drawEvent", async (data) => {
 		const roomId = socket.roomId;
@@ -502,14 +503,14 @@ io.on("connection", (socket) => {
 			if (roomId) {
 				await Board.updateOne(
 					{ roomId },
-					{ 
+					{
 						$push: { history: data },
-						$set: { updatedAt: Date.now() }
+						$set: { updatedAt: Date.now() },
 					}
 				);
 			}
 		} catch (error) {
-			console.error('Error saving drawing event:', error);
+			console.error("Error saving drawing event:", error);
 		}
 	});
 
@@ -525,16 +526,16 @@ io.on("connection", (socket) => {
 			try {
 				await Board.updateOne(
 					{ roomId },
-					{ 
-						$set: { 
+					{
+						$set: {
 							history: [],
-							updatedAt: Date.now()
-						}
+							updatedAt: Date.now(),
+						},
 					}
 				);
 				console.log(`Board ${roomId} cleared by ${socket.id}`);
 			} catch (error) {
-				console.error('Error clearing board history:', error);
+				console.error("Error clearing board history:", error);
 			}
 		}
 	});
@@ -542,31 +543,31 @@ io.on("connection", (socket) => {
 	// Handle disconnection
 	socket.on("disconnect", () => {
 		console.log("User disconnected:", socket.id);
-		
+
 		// Find which room this socket was in
 		const roomId = socket.roomId;
 		if (roomId && rooms[roomId] && rooms[roomId].users) {
 			// Get user info before removing
 			const userInfo = rooms[roomId].users[socket.id];
-			
+
 			// Remove user from room
 			delete rooms[roomId].users[socket.id];
-			
+
 			// Notify other users with more information
 			if (userInfo) {
 				io.to(roomId).emit("userLeft", {
 					id: socket.id,
-					name: userInfo.name || "Unknown User"
+					name: userInfo.name || "Unknown User",
 				});
 			} else {
 				io.to(roomId).emit("userLeft", {
 					id: socket.id,
-					name: "Unknown User"
+					name: "Unknown User",
 				});
 			}
-			
+
 			io.to(roomId).emit("userCount", Object.keys(rooms[roomId].users).length);
-			
+
 			// If room is empty, clean up (but don't delete from DB)
 			if (Object.keys(rooms[roomId].users).length === 0) {
 				delete rooms[roomId];
@@ -611,29 +612,50 @@ app.get("/register", (req, res) => {
 	res.sendFile(path.join(__dirname, "register.html"));
 });
 
+// Create test user if not exists
+const createTestUser = async () => {
+	try {
+		const testEmail = "test@example.com";
+		const testPassword = "password123";
+
+		const existingUser = await User.findOne({ email: testEmail });
+		if (!existingUser) {
+			const user = new User({
+				fullName: "Test User",
+				email: testEmail,
+				password: testPassword,
+			});
+			await user.save();
+			console.log("Test user created:", testEmail);
+		}
+	} catch (error) {
+		console.error("Error creating test user:", error);
+	}
+};
+
 // Start server
 const PORT = process.env.PORT || 5050;
 
 // Function to check if port is in use
 function isPortInUse(port) {
 	return new Promise((resolve) => {
-		const net = require('net');
+		const net = require("net");
 		const server = net.createServer();
-		
-		server.once('error', (err) => {
-			if (err.code === 'EADDRINUSE') {
+
+		server.once("error", (err) => {
+			if (err.code === "EADDRINUSE") {
 				resolve(true);
 			} else {
 				resolve(false);
 			}
 			server.close();
 		});
-		
-		server.once('listening', () => {
+
+		server.once("listening", () => {
 			server.close();
 			resolve(false);
 		});
-		
+
 		server.listen(port);
 	});
 }
@@ -643,17 +665,15 @@ function findAndKillProcessOnPort(port) {
 	return new Promise((resolve) => {
 		try {
 			// Use execSync for synchronous execution
-			const { execSync } = require('child_process');
-			
+			const { execSync } = require("child_process");
+
 			// Get all PIDs in one go
-			const stdout = execSync(
-				`netstat -ano | findstr :${port} | findstr LISTENING`
-			).toString();
+			const stdout = execSync(`netstat -ano | findstr :${port} | findstr LISTENING`).toString();
 
 			// Extract unique PIDs first
 			const pids = new Set();
-			const lines = stdout.trim().split('\n');
-			
+			const lines = stdout.trim().split("\n");
+
 			for (const line of lines) {
 				const parts = line.trim().split(/\s+/);
 				const pid = parts[parts.length - 1];
@@ -674,68 +694,68 @@ function findAndKillProcessOnPort(port) {
 					console.warn(`Process ${pid} already terminated: ${killError.message}`);
 				}
 			}
-			
+
 			resolve(success);
 		} catch (error) {
-			if (error.message.includes('Command failed')) {
-				console.warn('No processes found using port', port);
+			if (error.message.includes("Command failed")) {
+				console.warn("No processes found using port", port);
 			} else {
-				console.warn('Error:', error.message);
+				console.warn("Error:", error.message);
 			}
 			resolve(false);
 		}
 	});
 }
 
-
-
 // Start server with port checking - improved version
 async function startServer() {
 	let inUse = await isPortInUse(PORT);
 	let attempts = 0;
 	const maxAttempts = 3;
-	
+
 	while (inUse && attempts < maxAttempts) {
 		attempts++;
-		console.log(`Port ${PORT} is already in use. Attempting to kill the process... (Attempt ${attempts}/${maxAttempts})`);
-		
-		if (process.platform === 'win32') {
+		console.log(
+			`Port ${PORT} is already in use. Attempting to kill the process... (Attempt ${attempts}/${maxAttempts})`
+		);
+
+		if (process.platform === "win32") {
 			await findAndKillProcessOnPort(PORT);
 		} else {
 			// For Mac/Linux
 			try {
-				require('child_process').execSync(`lsof -i :${PORT} -t | xargs kill -9`);
+				require("child_process").execSync(`lsof -i :${PORT} -t | xargs kill -9`);
 				console.log(`Process using port ${PORT} was terminated`);
 			} catch (error) {
 				console.warn(`Could not kill process on port ${PORT}: ${error.message}`);
 			}
 		}
-		
+
 		// Wait for the port to be released
-		await new Promise(resolve => setTimeout(resolve, 2000));
-		
+		await new Promise((resolve) => setTimeout(resolve, 2000));
+
 		// Check again if the port is still in use
 		inUse = await isPortInUse(PORT);
 	}
-	
+
 	if (inUse) {
 		console.error(`Port ${PORT} is still in use after ${maxAttempts} attempts.`);
 		console.error(`Please manually close the application using port ${PORT} and try again.`);
 		process.exit(1);
 	}
-	
+
 	// Start the server
 	server.listen(PORT, () => {
 		console.log(`Server running on port ${PORT}`);
 	});
-	
+
 	// Handle any errors that might still occur
-	server.on('error', (e) => {
-		if (e.code === 'EADDRINUSE') {
+	server.on("error", (e) => {
+		if (e.code === "EADDRINUSE") {
 			console.error(`Failed to bind to port ${PORT}. The port is still in use.`);
 			process.exit(1);
 		} else {
-			console.error('Server error:', e);
+			console.error("Server error:", e);
 		}
 	});
 }
