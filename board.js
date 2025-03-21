@@ -1,4 +1,14 @@
 document.addEventListener("DOMContentLoaded", function () {
+	// Ensure DOM is fully loaded before accessing elements
+	const eraserCursor = document.getElementById("eraserCursor");
+	const brushSizeSelect = document.getElementById("brushSize");
+	const eraserSizeControl = document.getElementById("eraserSizeControl");
+
+	if (!eraserCursor || !brushSizeSelect || !eraserSizeControl) {
+		console.error("Required elements not found in DOM");
+		return;
+	}
+
 	// Socket.io setup
 	const socket = io();
 	let currentUserId = null;
@@ -72,7 +82,6 @@ document.addEventListener("DOMContentLoaded", function () {
 	saveState();
 
 	// Add event listener for brush size selection
-	const brushSizeSelect = document.getElementById("brushSize");
 	brushSizeSelect.addEventListener("change", (e) => {
 		currentWidth = parseInt(e.target.value);
 	});
@@ -331,9 +340,32 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Add event listeners for drawing
 	canvas.addEventListener("mousedown", startDrawing);
-	canvas.addEventListener("mousemove", draw);
+	canvas.addEventListener("mousemove", (e) => {
+		draw(e);
+		updateEraserCursor(e);
+	});
 	canvas.addEventListener("mouseup", stopDrawing);
 	canvas.addEventListener("mouseout", stopDrawing);
+
+	// Update eraser cursor position and size
+	function updateEraserCursor(e) {
+		if (currentTool === "eraser") {
+			const eraserCursor = document.getElementById("eraserCursor");
+			const rect = canvas.getBoundingClientRect();
+			const x = e.clientX - rect.left;
+			const y = e.clientY - rect.top;
+			const size = parseInt(eraserSizeSelect.value);
+
+			eraserCursor.style.display = "block";
+			eraserCursor.style.width = `${size}px`;
+			eraserCursor.style.height = `${size}px`;
+			eraserCursor.style.left = `${x}px`;
+			eraserCursor.style.top = `${y}px`;
+			eraserCursor.style.borderColor = `rgba(0,0,0,${size > 20 ? 0.8 : 0.5})`;
+		} else {
+			document.getElementById("eraserCursor").style.display = "none";
+		}
+	}
 
 	// Add touch support for mobile devices
 	canvas.addEventListener("touchstart", (e) => {
@@ -370,6 +402,23 @@ document.addEventListener("DOMContentLoaded", function () {
 	const brushOpacitySlider = document.getElementById("brushOpacity");
 	const eraserSettings = document.getElementById("eraserSettings");
 	const eraserSizeSelect = document.getElementById("eraserSize");
+	const eraserBtn = document.getElementById("eraserBtn");
+	// const eraserCursor = document.getElementById("eraserCursor");
+	const eraserSizeSlider = document.getElementById("eraserSize");
+	// const eraserSizeControl = document.getElementById("eraserSizeControl");
+
+	// Update eraser cursor size when slider changes
+	if (eraserSizeSlider) {
+		eraserSizeSlider.addEventListener("input", (e) => {
+			const size = parseInt(e.target.value);
+			const eraserCursor = document.getElementById("eraserCursor");
+			if (eraserCursor) {
+				eraserCursor.style.width = `${size}px`;
+				eraserCursor.style.height = `${size}px`;
+				eraserCursor.style.borderColor = `rgba(0,0,0,${size > 20 ? 0.8 : 0.5})`;
+			}
+		});
+	}
 
 	toolButtons.forEach((button) => {
 		button.addEventListener("click", () => {
@@ -392,10 +441,17 @@ document.addEventListener("DOMContentLoaded", function () {
 			// Show eraser settings if eraser tool is selected
 			if (currentTool === "eraser") {
 				eraserSettings.style.display = "block";
-				canvas.classList.add("eraser-cursor");
+				const eraserSize = parseInt(eraserSizeSlider.value);
+				const cursorSize = Math.max(10, eraserSize * 0.5); // Minimum size of 10px
+				canvas.style.cursor = `none`;
+				const eraserCursor = document.getElementById("eraserCursor");
+				if (eraserCursor) {
+					eraserCursor.style.width = `${cursorSize}px`;
+					eraserCursor.style.height = `${cursorSize}px`;
+				}
 			} else {
 				eraserSettings.style.display = "none";
-				canvas.classList.remove("eraser-cursor");
+				canvas.style.cursor = "default";
 			}
 		});
 	});
@@ -1165,5 +1221,63 @@ document.addEventListener("DOMContentLoaded", function () {
 		document.getElementById("cancelExit").addEventListener("click", () => {
 			modal.remove();
 		});
+	}
+
+	// Initialize eraser functionality
+	let isEraserActive = false; // Move declaration to outer scope
+	if (eraserBtn && eraserCursor && eraserSizeControl && brushSizeSelect) {
+		eraserBtn.addEventListener("click", () => {
+			isEraserActive = !isEraserActive;
+			eraserBtn.classList.toggle("active");
+			canvas.classList.toggle("eraser-active");
+
+			// Add null checks before accessing style
+			try {
+				if (eraserCursor && eraserCursor.style) {
+					eraserCursor.style.display = isEraserActive ? "block" : "none";
+				}
+				if (brushSizeSelect && brushSizeSelect.style) {
+					brushSizeSelect.style.display = isEraserActive ? "none" : "block";
+				}
+				if (eraserSizeControl && eraserSizeControl.style) {
+					eraserSizeControl.style.display = isEraserActive ? "block" : "none";
+				}
+			} catch (error) {
+				console.error("Error updating eraser UI:", error);
+			}
+
+			if (isEraserActive) {
+				ctx.save();
+				ctx.globalCompositeOperation = "destination-out";
+				ctx.strokeStyle = "rgba(0,0,0,1)";
+				ctx.lineWidth = eraserSizeSlider?.value || 10;
+				canvas.addEventListener("mousemove", updateEraserCursor);
+			} else {
+				ctx.restore();
+				canvas.removeEventListener("mousemove", updateEraserCursor);
+			}
+		});
+	}
+
+	// Initialize eraser size control
+	if (eraserSizeSlider) {
+		eraserSizeSlider.addEventListener("input", () => {
+			if (isEraserActive && ctx) {
+				ctx.lineWidth = eraserSizeSlider.value;
+				updateEraserCursor({
+					pageX: parseInt(eraserCursor?.style.left) || 0,
+					pageY: parseInt(eraserCursor?.style.top) || 0,
+				});
+			}
+		});
+	}
+
+	function updateEraserCursor(e) {
+		if (!isEraserActive || !eraserCursor) return;
+		const size = eraserSizeSlider?.value || 10;
+		eraserCursor.style.width = size + "px";
+		eraserCursor.style.height = size + "px";
+		eraserCursor.style.left = e.pageX + "px";
+		eraserCursor.style.top = e.pageY + "px";
 	}
 });

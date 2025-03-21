@@ -32,7 +32,17 @@
       <div class="hero-content">
         <div style="font-size: 2.2rem; font-weight: bold;" class="welcome-message">
           <span class="greeting">Hello,</span>
-          <span style="font-size: 2.2rem; font-weight: bold;" class="user-name" id="userNameDisplay">username</span>
+          <span style="font-size: 2.2rem; font-weight: bold;" class="user-name" id="userNameDisplay">
+            <script>
+              const user = localStorage.getItem('user');
+              if (user) {
+                const userData = JSON.parse(user);
+                document.write(userData.name);
+              } else {
+                document.write('Guest');
+              }
+            </script>
+          </span>
           <span style="font-size: 2.2rem; font-weight: bold;" class="welcome-emoji">👋</span>
         </div>
         <h1>Create & Collaborate in Real-Time</h1>

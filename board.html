@@ -1,368 +1,241 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <title id="pageTitle">Loading...</title>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="board.css" />
-    <link rel="stylesheet" href="board-enhanced.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-    <script src="/socket.io/socket.io.js"></script>
-    <script type="module" src="board.js"></script>
-  </head>
-  <body class="board-page">
-    <header class="board-header">
-      <div class="board-nav">
-        <div class="logo">
-          <i class="fas fa-pencil-alt"></i>
-          <a href="/">Collaboard</a>
-        </div>
-        <div class="room-info">
-          <h2 id="roomName">Loading...</h2>
-          <div class="room-status">
-            <span id="connectionStatus"><i class="fas fa-circle-notch fa-spin"></i> Connecting...</span>
-            <span id="usersCount"><i class="fas fa-user"></i> 1 user</span>
-          </div>
-        </div>
-        <div class="board-actions">
-          <button class="btn btn-outline" id="shareBtn">
-            <i class="fas fa-share-alt"></i> Share
-          </button>
-          <button class="btn btn-outline" id="saveBtn">
-            <i class="fas fa-save"></i> Save
-          </button>
-          <a id="exitBtn" href="/" class="btn btn-outline">
-            <i class="fas fa-times"></i> Exit
-          </a>
+
+<head>
+  <title id="pageTitle">Loading...</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="board.css" />
+  <link rel="stylesheet" href="board-enhanced.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module" src="board.js"></script>
+  <style>
+    /* Eraser cursor style */
+    canvas.eraser-active {
+      cursor: none;
+    }
+
+    #eraserCursor {
+      position: fixed;
+      pointer-events: none;
+      border: 1px solid rgba(0, 0, 0, 0.5);
+      border-radius: 50%;
+      background-color: rgba(255, 255, 255, 0.3);
+      display: none;
+      z-index: 1000;
+      transform: translate(-50%, -50%);
+    }
+  </style>
+</head>
+
+<body class="board-page">
+  <header class="board-header">
+    <div class="board-nav">
+      <div class="logo">
+        <i class="fas fa-pencil-alt"></i>
+        <a href="/">Collaboard</a>
+      </div>
+      <div class="room-info">
+        <h2 id="roomName">Loading...</h2>
+        <div class="room-status">
+          <span id="connectionStatus"><i class="fas fa-circle-notch fa-spin"></i> Connecting...</span>
+          <span id="usersCount"><i class="fas fa-user"></i> 1 user</span>
         </div>
       </div>
-      <div class="toolbar">
-        <div class="tool-group drawing-tools">
-          <span class="tool-group-label">Draw</span>
-          <div class="tool-buttons">
-            <button class="tool-btn active" data-tool="brush" title="Brush">
-              <i class="fas fa-paint-brush"></i>
-            </button>
-            <button class="tool-btn" data-tool="line" title="Line">
-              <i class="fas fa-slash"></i>
-            </button>
-            <button class="tool-btn" data-tool="rectangle" title="Rectangle">
-              <i class="far fa-square"></i>
-            </button>
-            <button class="tool-btn" data-tool="circle" title="Circle">
-              <i class="far fa-circle"></i>
-            </button>
-            <button class="tool-btn" data-tool="text" title="Text">
-              <i class="fas fa-font"></i>
-            </button>
-            <button class="tool-btn" id="eraserBtn" data-tool="eraser" title="Eraser">
-              <i class="fas fa-eraser"></i>
-            </button>
-          </div>
+      <div class="board-actions">
+        <button class="btn btn-outline" id="shareBtn">
+          <i class="fas fa-share-alt"></i> Share
+        </button>
+        <button class="btn btn-outline" id="saveBtn">
+          <i class="fas fa-save"></i> Save
+        </button>
+        <a id="exitBtn" href="/" class="btn btn-outline">
+          <i class="fas fa-times"></i> Exit
+        </a>
+      </div>
+    </div>
+    <div class="toolbar">
+      <div class="tool-group drawing-tools">
+        <span class="tool-group-label">Draw</span>
+        <div class="tool-buttons">
+          <button class="tool-btn active" data-tool="brush" title="Brush">
+            <i class="fas fa-paint-brush"></i>
+          </button>
+          <button class="tool-btn" data-tool="line" title="Line">
+            <i class="fas fa-slash"></i>
+          </button>
+          <button class="tool-btn" data-tool="rectangle" title="Rectangle">
+            <i class="far fa-square"></i>
+          </button>
+          <button class="tool-btn" data-tool="circle" title="Circle">
+            <i class="far fa-circle"></i>
+          </button>
+          <button class="tool-btn" data-tool="text" title="Text">
+            <i class="fas fa-font"></i>
+          </button>
+          <button class="tool-btn" id="eraserBtn" data-tool="eraser" title="Eraser">
+            <i class="fas fa-eraser"></i>
+          </button>
         </div>
-        
-        <div class="tool-group style-tools">
-          <span class="tool-group-label">Style</span>
-          <div class="style-controls">
-            <div class="size-control">
-              <label for="brushSize">Size:</label>
-              <select id="brushSize" class="styled-select">
-                <option value="2">Small</option>
-                <option value="5" selected>Medium</option>
-                <option value="10">Large</option>
-                <option value="15">X-Large</option>
-              </select>
-            </div>
-            <div class="color-control">
-              <label for="colorPicker">Color:</label>
-              <input type="color" id="colorPicker" value="#000000" title="Color">
-            </div>
-          </div>
-        </div>
+      </div>
 
-        <div class="tool-group" id="eraserSettings" style="display: none;">
-          <span class="tool-group-label">Eraser</span>
-          <div class="eraser-controls">
-            <label for="eraserSize">Size:</label>
-            <select id="eraserSize" class="styled-select">
-              <option value="5">Small</option>
-              <option value="10" selected>Medium</option>
-              <option value="15">Large</option>
-              <option value="25">X-Large</option>
+      <div class="tool-group style-tools">
+        <span class="tool-group-label">Style</span>
+        <div class="style-controls">
+          <div class="size-control">
+            <label for="brushSize">Size:</label>
+            <select id="brushSize" class="styled-select">
+              <option value="2">Small</option>
+              <option value="5" selected>Medium</option>
+              <option value="10">Large</option>
+              <option value="15">X-Large</option>
             </select>
           </div>
-        </div>
-
-        <div class="tool-group action-tools">
-          <span class="tool-group-label">Actions</span>
-          <div class="action-buttons">
-            <button class="tool-btn" id="undoBtn" title="Undo">
-              <i class="fas fa-undo"></i>
-            </button>
-            <button class="tool-btn" id="redoBtn" title="Redo">
-              <i class="fas fa-redo"></i>
-            </button>
-            <button class="tool-btn danger" id="clearBtn" title="Clear All">
-              <i class="fas fa-trash"></i>
-            </button>
+          <div class="color-control">
+            <label for="colorPicker">Color:</label>
+            <input type="color" id="colorPicker" value="#000000" title="Color">
           </div>
-        </div>
-
-        
-      </div>
-    </header>
-
-    <main class="board-container">
-      <canvas id="whiteboard"></canvas>
-    </main>
-
-    <div class="modal" id="shareModal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3><i class="fas fa-share-alt"></i> Share this board</h3>
-          <button class="close-btn" aria-label="Close"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="modal-body">
-          <p>Share this link with others to collaborate:</p>
-          <div class="share-link">
-            <input type="text" id="shareLink" readonly>
-            <button class="btn btn-primary" id="copyLinkBtn">
-              <i class="fas fa-copy"></i> Copy
-            </button>
-          </div>
-          
-          <div class="board-code-section">
-            <p>Or share this 6-digit code - others can enter it on the homepage to join this board:</p>
-            <div class="code-display">
-              <span id="boardCode" class="board-code"></span>
-              <button class="btn btn-outline" id="copyCodeBtn">
-                <i class="fas fa-copy"></i> Copy Code
-              </button>
-            </div>
-          </div>
-          
-          <div class="share-options">
-            <div class="option-group">
-              <div class="option">
-                <input type="checkbox" id="enablePassword">
-                <label for="enablePassword">Protect with password</label>
-              </div>
-              <div class="password-input" style="display: none;">
-                <input type="password" id="boardPassword" placeholder="Enter password">
-                <button class="btn btn-primary" id="setPasswordBtn">Set Password</button>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn close-btn2 btn-secondary close-modal">Close</button>
         </div>
       </div>
-    </div>
 
-    <div class="users-panel" id="usersPanel">
-      <div class="panel-header">
-        <h3><i class="fas fa-users"></i> Collaborators</h3>
-        <!-- <button class="toggle-panel" id="toggleUsersPanel" title="Toggle Users Panel"> -->
-          <!-- <i class="fas fa-chevron-right"></i>   -->
-        <!-- </button> -->
-      </div>
-      <div class="panel-content">
-        <div class="users-list" id="usersList">
-          <!-- Users will be added dynamically -->
-        </div>
-        <div class="panel-actions">
-          <button class="btn btn-sm" id="inviteUser">
-            <i class="fas fa-user-plus"></i> Invite
+      <div class="tool-group action-tools">
+        <span class="tool-group-label">Actions</span>
+        <div class="action-buttons">
+          <button class="tool-btn" id="undoBtn" title="Undo">
+            <i class="fas fa-undo"></i>
+          </button>
+          <button class="tool-btn" id="redoBtn" title="Redo">
+            <i class="fas fa-redo"></i>
+          </button>
+          <button class="tool-btn danger" id="clearBtn" title="Clear All">
+            <i class="fas fa-trash"></i>
           </button>
         </div>
       </div>
-    </div>
 
-    <div class="toast-container" id="toastContainer">
-      <div class="toast" id="toast">
-        <div class="toast-content">
-          <i class="toast-icon fas fa-info-circle"></i>
-          <div class="toast-message-container">
-            <span id="toastMessage"></span>
+    </div>
+  </header>
+
+  <main class="board-container">
+    <canvas id="whiteboard"></canvas>
+  </main>
+
+  <div class="modal" id="shareModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3><i class="fas fa-share-alt"></i> Share this board</h3>
+        <button class="close-btn" aria-label="Close"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <p>Share this link with others to collaborate:</p>
+        <div class="share-link">
+          <input type="text" id="shareLink" readonly>
+          <button class="btn btn-primary" id="copyLinkBtn">
+            <i class="fas fa-copy"></i> Copy
+          </button>
+        </div>
+
+        <div class="board-code-section">
+          <p>Or share this 6-digit code - others can enter it on the homepage to join this board:</p>
+          <div class="code-display">
+            <span id="boardCode" class="board-code"></span>
+            <button class="btn btn-outline" id="copyCodeBtn">
+              <i class="fas fa-copy"></i> Copy Code
+            </button>
           </div>
-          <button class="toast-close" aria-label="Close notification"><i class="fas fa-times"></i></button>
+        </div>
+
+        <div class="share-options">
+          <div class="option-group">
+            <div class="option">
+              <input type="checkbox" id="enablePassword">
+              <label for="enablePassword">Protect with password</label>
+            </div>
+            <div class="password-input" style="display: none;">
+              <input type="password" id="boardPassword" placeholder="Enter password">
+              <button class="btn btn-primary" id="setPasswordBtn">Set Password</button>
+            </div>
+          </div>
         </div>
       </div>
+      <div class="modal-footer">
+        <button class="btn close-btn2 btn-secondary close-modal">Close</button>
+      </div>
     </div>
+  </div>
 
-    <div id="brushSettings" class="brush-settings" style="display: none;">
-      <h3>Brush Settings</h3>
-      <label for="brushColor">Brush Color:</label>
-      <input type="color" id="brushColor" value="#000000">
-      
-      <label for="brushSizeSlider">Brush Size:</label>
-      <input type="range" id="brushSizeSlider" min="1" max="100" value="5">
-      
-      <label for="brushOpacity">Opacity:</label>
-      <input type="range" id="brushOpacity" min="0" max="100" value="100">
+  <div class="users-panel" id="usersPanel">
+    <div class="panel-header">
+      <h3><i class="fas fa-users"></i> Collaborators</h3>
+      <!-- <button class="toggle-panel" id="toggleUsersPanel" title="Toggle Users Panel"> -->
+      <!-- <i class="fas fa-chevron-right"></i>   -->
+      <!-- </button> -->
     </div>
-  </body>
+    <div class="panel-content">
+      <div class="users-list" id="usersList">
+        <!-- Users will be added dynamically -->
+      </div>
+      <div class="panel-actions">
+        <button class="btn btn-sm" id="inviteUser">
+          <i class="fas fa-user-plus"></i> Invite
+        </button>
+      </div>
+    </div>
+  </div>
 
+  <div class="toast-container" id="toastContainer" style="pointer-events: none;">
+    <div class="toast" id="toast">
+      <div class="toast-content">
+        <i class="toast-icon fas fa-info-circle"></i>
+        <div class="toast-message-container">
+          <span id="toastMessage"></span>
+        </div>
+        <button class="toast-close" aria-label="Close notification"><i class="fas fa-times"></i></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="brushSettings" class="brush-settings" style="display: none;">
+    <h3>Brush Settings</h3>
+    <label for="brushColor">Brush Color:</label>
+    <input type="color" id="brushColor" value="#000000">
+
+    <label for="brushSizeSlider">Brush Size:</label>
+    <input type="range" id="brushSizeSlider" min="1" max="100" value="5">
+
+    <label for="brushOpacity">Opacity:</label>
+    <input type="range" id="brushOpacity" min="0" max="100" value="100">
+  </div>
+
+  <div id="eraserSettings" class="eraser-settings" style="display: none;">
+    <h3>Eraser Settings</h3>
+    <label for="eraserSize">Eraser Size:</label>
+    <input type="range" id="eraserSize" min="5" max="70" value="30" class="size-slider">
+    <div id="eraserSizeControl"></div>
+  </div>
+
+  <!-- Add eraser cursor element -->
+  <div id="eraserCursor" style="
+    position: absolute;
+    pointer-events: none;
+    border: 2px solid rgba(0,0,0,0.8);
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.8);
+    display: none;
+    z-index: 1000;
+    transform: translate(-50%, -50%);
+    transition: width 0.1s, height 0.1s;
+  "></div>
+
+  <!-- Remove all the script content and just keep this initialization script -->
   <script>
-    // Direct DOM manipulation to ensure users appear with enhanced UI
-  async function ensureUsersExist() {
-    const usersList = document.getElementById('usersList');
-    if (usersList && usersList.children.length === 0) {
-      console.log("Adding users with enhanced UI");
-
-      // Add some styling to the users list
-      usersList.style.padding = '8px';
-
-      const users = [
-        // load users from the database
-      ];
-      
-      //load users from the database and store into users array 
-       users = await User.find({ roomId: roomId });
-      users.forEach(user => {
-        const userItem = document.createElement('div');
-        userItem.className = 'user-item';
-        userItem.style.display = 'flex';
-        userItem.style.alignItems = 'center';
-        userItem.style.gap = '12px';
-        userItem.style.padding = '12px 16px';
-        userItem.style.margin = '0 0 10px 0';
-        userItem.style.backgroundColor = 'white';
-        userItem.style.boxShadow = '0 2px 6px rgba(0,0,0,0.08)';
-        userItem.style.borderRadius = '8px';
-        userItem.style.transition = 'transform 0.2s, box-shadow 0.2s';
-
-        // Add hover effect
-        userItem.addEventListener('mouseenter', () => {
-          userItem.style.transform = 'translateY(-2px)';
-          userItem.style.boxShadow = '0 4px 12px rgba(0,0,0,0.12)';
-        });
-
-        userItem.addEventListener('mouseleave', () => {
-          userItem.style.transform = 'translateY(0)';
-          userItem.style.boxShadow = '0 2px 6px rgba(0,0,0,0.08)';
-        });
-
-        const initial = user.name.charAt(0);
-
-        // Create avatar with enhanced styling
-        const avatarContainer = document.createElement('div');
-        avatarContainer.className = 'user-avatar';
-        avatarContainer.style.width = '40px';
-        avatarContainer.style.height = '40px';
-        avatarContainer.style.backgroundColor = user.color;
-        avatarContainer.style.color = 'white';
-        avatarContainer.style.fontWeight = 'bold';
-        avatarContainer.style.fontSize = '16px';
-        avatarContainer.style.display = 'flex';
-        avatarContainer.style.alignItems = 'center';
-        avatarContainer.style.justifyContent = 'center';
-        avatarContainer.style.borderRadius = '50%';
-
-        // Add glow effect for current user
-        if (user.isCurrentUser) {
-          avatarContainer.style.boxShadow = `0 0 0 2px white, 0 0 0 4px ${user.color}`;
-        }
-
-        const avatarInitial = document.createElement('span');
-        avatarInitial.textContent = initial;
-        avatarContainer.appendChild(avatarInitial);
-
-        // Create user info container
-        const userInfo = document.createElement('div');
-        userInfo.className = 'user-info';
-        userInfo.style.flexGrow = '1';
-
-        // Create user name
-        const userName = document.createElement('div');
-        userName.className = 'user-name';
-        userName.style.fontWeight = 'bold';
-        userName.style.fontSize = '14px';
-        userName.style.color = '#333';
-        userName.style.marginBottom = '4px';
-        userName.textContent = user.name;
-
-        // Add "(You)" badge for current user
-        if (user.isCurrentUser) {
-          const youBadge = document.createElement('span');
-          youBadge.textContent = ' (You)';
-          // youBadge.style.backgroundColor = '#e0e7ff';
-          youBadge.style.color = '#4f46e5';
-          youBadge.style.padding = '2px 6px';
-          youBadge.style.borderRadius = '10px';
-          youBadge.style.fontSize = '10px';
-          youBadge.style.marginLeft = '6px';
-          userName.appendChild(youBadge);
-        }
-
-        userInfo.appendChild(userName);
-
-        // Create status with colored indicator
-        const userStatus = document.createElement('div');
-        userStatus.className = 'user-status';
-        userStatus.style.display = 'flex';
-        userStatus.style.alignItems = 'center';
-        userStatus.style.fontSize = '12px';
-        userStatus.style.color = '#666';
-
-        const statusIndicator = document.createElement('span');
-        statusIndicator.style.width = '8px';
-        statusIndicator.style.height = '8px';
-        statusIndicator.style.borderRadius = '50%';
-        statusIndicator.style.backgroundColor = user.statusColor;
-        statusIndicator.style.marginRight = '6px';
-        statusIndicator.style.display = 'inline-block';
-
-        userStatus.appendChild(statusIndicator);
-        userStatus.appendChild(document.createTextNode(user.status));
-        userInfo.appendChild(userStatus);
-
-        // Add all elements to the user item
-        userItem.appendChild(avatarContainer);
-        userItem.appendChild(userInfo);
-
-        usersList.appendChild(userItem);
-      });
-
-      // Style the panel content area
-      const panelContent = document.querySelector('.panel-content');
-      if (panelContent) {
-        panelContent.style.padding = '12px';
-        panelContent.style.backgroundColor = '#f8f9fa';
-      }
-
-      // Enhance the invite button
-      const inviteBtn = document.getElementById('inviteUser');
-      if (inviteBtn) {
-        inviteBtn.style.width = '100%';
-        inviteBtn.style.padding = '10px';
-        inviteBtn.style.borderRadius = '6px';
-        inviteBtn.style.fontWeight = '500';
-        inviteBtn.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-        inviteBtn.style.transition = 'transform 0.2s';
-
-        inviteBtn.addEventListener('mouseenter', () => {
-          inviteBtn.style.transform = 'translateY(-2px)';
-        });
-
-        inviteBtn.addEventListener('mouseleave', () => {
-          inviteBtn.style.transform = 'translateY(0)';
-        });
-      }
-
-      // Enhance the panel header
-      const panelHeader = document.querySelector('.panel-header');
-      if (panelHeader) {
-        panelHeader.style.background = 'linear-gradient(135deg, #4a6ee0, #8a56e0)';
-        panelHeader.style.padding = '14px 16px';
-        panelHeader.style.borderRadius = '8px 0 0 0';
-      }
-    }
-  }
-
-  // Try immediately
+    // Wait for board.js to load and initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      // The initialization will be handled by board.js
+    });
   </script>
+</body>
 
 </html>
