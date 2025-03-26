@@ -262,6 +262,7 @@ app.get("/api/boards/code/:code", async (req, res) => {
 
 // Socket.io connection handling
 io.on("connection", (socket) => {
+	// a user connected
 	console.log("A user connected:", socket.id);
 
 	// Join a room

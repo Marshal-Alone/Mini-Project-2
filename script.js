@@ -139,16 +139,33 @@ document.addEventListener("DOMContentLoaded", function () {
 			// If it's a board code, try to find the corresponding board
 			if (isBoardCode) {
 				try {
+					// Show a loading indicator or message
+					startBoardingButton.disabled = true;
+					startBoardingButton.textContent = "Looking for board...";
+					
 					const response = await fetch(`/api/boards/code/${roomName}`);
+					
+					// Reset button state
+					startBoardingButton.disabled = false;
+					startBoardingButton.textContent = "Start";
+					
 					if (response.ok) {
 						const data = await response.json();
+						// Redirect to the found board
 						window.location.href = `/board?room=${encodeURIComponent(
 							data.roomId
 						)}&name=${encodeURIComponent(data.name)}`;
 						return;
+					} else {
+						// If server responds but board not found
+						alert(`Board with code ${roomName} not found. Creating a new board instead.`);
 					}
 				} catch (error) {
 					console.log("Error finding board by code:", error);
+					alert("Error connecting to server. Please try again.");
+					startBoardingButton.disabled = false;
+					startBoardingButton.textContent = "Start";
+					return;
 				}
 			}
 
@@ -157,6 +174,9 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (user) {
 				// Create board in database if logged in
 				try {
+					startBoardingButton.disabled = true;
+					startBoardingButton.textContent = "Creating board...";
+					
 					const response = await fetch("/api/boards", {
 						method: "POST",
 						headers: {
@@ -165,6 +185,9 @@ document.addEventListener("DOMContentLoaded", function () {
 						},
 						body: JSON.stringify({ name: roomName }),
 					});
+
+					startBoardingButton.disabled = false;
+					startBoardingButton.textContent = "Start";
 
 					if (response.ok) {
 						const data = await response.json();
@@ -177,6 +200,8 @@ document.addEventListener("DOMContentLoaded", function () {
 				} catch (error) {
 					console.error("Board creation error:", error);
 					alert("Failed to create board. Please try again.");
+					startBoardingButton.disabled = false;
+					startBoardingButton.textContent = "Start";
 				}
 			} else {
 				// Just redirect to a new room if not logged in
@@ -193,7 +218,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	if (loginForm) {
 		loginForm.addEventListener("submit", async (e) => {
 			e.preventDefault();
-			const email = document.getElementById("email").value;
+			const email = document.getElementById("login-email").value;
 			const password = document.getElementById("l-password").value;
 
 			try {
@@ -242,7 +267,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		registerForm.addEventListener("submit", async (e) => {
 			e.preventDefault();
 			const fullName = document.getElementById("fullName")?.value;
-			const email = document.getElementById("email")?.value;
+			const email = document.getElementById("register-email")?.value;
 			const password = document.getElementById("password")?.value;
 
 			// Simple validation

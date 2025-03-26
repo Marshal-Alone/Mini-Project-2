@@ -1,10 +1,12 @@
 document.addEventListener("DOMContentLoaded", function () {
-	// Ensure DOM is fully loaded before accessing elements
+	// Initialize important DOM elements first
+	const connectionStatus = document.getElementById("connectionStatus");
 	const eraserCursor = document.getElementById("eraserCursor");
 	const brushSizeSelect = document.getElementById("brushSize");
 	const eraserSizeControl = document.getElementById("eraserSizeControl");
 
-	if (!eraserCursor || !brushSizeSelect || !eraserSizeControl) {
+	// Check if required elements exist
+	if (!eraserCursor || !brushSizeSelect || !eraserSizeControl || !connectionStatus) {
 		console.error("Required elements not found in DOM");
 		return;
 	}
@@ -55,6 +57,26 @@ document.addEventListener("DOMContentLoaded", function () {
 	// Initialize canvas size
 	resizeCanvas();
 	window.addEventListener("resize", resizeCanvas);
+
+	// Initialize eraser settings
+	const eraserSizeSelect = document.getElementById("eraserSize");
+	if (eraserSizeSelect) {
+		// Default eraser size
+		const defaultEraserSize = 30;
+		eraserSizeSelect.value = defaultEraserSize;
+		
+		// Create a visual indicator for eraser size
+		const eraserSizeControl = document.getElementById("eraserSizeControl");
+		if (eraserSizeControl) {
+			eraserSizeControl.innerHTML = `<div class="size-indicator" style="width: ${defaultEraserSize}px; height: ${defaultEraserSize}px; border-radius: 50%; border: 1px solid #000; margin: 10px auto;"></div>`;
+			
+			// Update the visual indicator when slider changes
+			eraserSizeSelect.addEventListener("input", (e) => {
+				const size = parseInt(e.target.value);
+				eraserSizeControl.innerHTML = `<div class="size-indicator" style="width: ${size}px; height: ${size}px; border-radius: 50%; border: 1px solid #000; margin: 10px auto;"></div>`;
+			});
+		}
+	}
 
 	// Save current state to history
 	function saveState() {
@@ -118,6 +140,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		// Draw based on selected tool
 		switch (currentTool) {
 			case "brush":
+				ctx.globalCompositeOperation = "source-over"; // Ensure normal drawing mode
 				ctx.strokeStyle = currentColor;
 				ctx.globalAlpha = brushOpacitySlider.value / 100; // Use the selected opacity
 				ctx.beginPath();
@@ -141,17 +164,37 @@ document.addEventListener("DOMContentLoaded", function () {
 			case "eraser":
 				// Set composite operation to destination-out for erasing
 				ctx.globalCompositeOperation = "destination-out";
+				// Clear a circle at the cursor position
 				ctx.beginPath();
-				ctx.arc(currentX, currentY, parseInt(eraserSizeSelect.value) / 2, 0, Math.PI * 2, false);
+				const eraserSize = parseInt(eraserSizeSelect.value);
+				// Draw a continuous line for smooth erasing
+				ctx.lineWidth = eraserSize;
+				ctx.strokeStyle = "rgba(255,255,255,1)"; // Color doesn't matter with destination-out
+				ctx.beginPath();
+				ctx.moveTo(lastX, lastY);
+				ctx.lineTo(currentX, currentY);
+				ctx.stroke();
+				
+				// Also draw a circle at current position for spot erasing
+				ctx.beginPath();
+				ctx.arc(currentX, currentY, eraserSize / 2, 0, Math.PI * 2, false);
 				ctx.fill();
 
-				// Emit erase event to server
+				// Emit erase event to server with full details for better synchronization
 				socket.emit("drawEvent", {
 					tool: "eraser",
-					startX: currentX,
-					startY: currentY,
-					width: parseInt(eraserSizeSelect.value), // Send eraser size
+					startX: lastX,
+					startY: lastY,
+					endX: currentX,
+					endY: currentY,
+					width: eraserSize,
+					timestamp: Date.now() // Add timestamp for sequencing
 				});
+				
+				// Save state after erasing occasionally to avoid performance issues
+				if (Math.random() < 0.05) {
+					saveState();
+				}
 				break;
 
 			case "line":
@@ -159,6 +202,9 @@ document.addEventListener("DOMContentLoaded", function () {
 				if (historyIndex >= 0) {
 					ctx.drawImage(history[historyIndex], 0, 0);
 				}
+				ctx.strokeStyle = currentColor;
+				ctx.lineWidth = currentWidth;
+				ctx.fillStyle = "transparent";
 				ctx.beginPath();
 				ctx.moveTo(lastX, lastY);
 				ctx.lineTo(currentX, currentY);
@@ -170,6 +216,9 @@ document.addEventListener("DOMContentLoaded", function () {
 				if (historyIndex >= 0) {
 					ctx.drawImage(history[historyIndex], 0, 0);
 				}
+				ctx.strokeStyle = currentColor;
+				ctx.lineWidth = currentWidth;
+				ctx.fillStyle = "transparent";
 				ctx.beginPath();
 				const width = currentX - lastX;
 				const height = currentY - lastY;
@@ -182,6 +231,9 @@ document.addEventListener("DOMContentLoaded", function () {
 				if (historyIndex >= 0) {
 					ctx.drawImage(history[historyIndex], 0, 0);
 				}
+				ctx.strokeStyle = currentColor;
+				ctx.lineWidth = currentWidth;
+				ctx.fillStyle = "transparent";
 				ctx.beginPath();
 				const radius = Math.sqrt(Math.pow(currentX - lastX, 2) + Math.pow(currentY - lastY, 2));
 				ctx.arc(lastX, lastY, radius, 0, Math.PI * 2);
@@ -201,12 +253,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		// After drawing or erasing
 		ctx.globalCompositeOperation = "source-over"; // Reset to default
+		ctx.globalAlpha = 1; // Reset opacity
 	}
 
 	function stopDrawing(event) {
 		if (!isDrawing) return;
 		isDrawing = false;
 
+		// Save the current state
+		saveState();
+		
 		// Get current mouse position
 		const rect = canvas.getBoundingClientRect();
 		const currentX = event.clientX - rect.left;
@@ -235,7 +291,7 @@ document.addEventListener("DOMContentLoaded", function () {
 						width: currentX - lastX,
 						height: currentY - lastY,
 						color: currentColor,
-						lineWidth: currentWidth,
+						lineWidth: currentWidth, // Change width to lineWidth to avoid conflict
 					});
 					break;
 
@@ -247,14 +303,11 @@ document.addEventListener("DOMContentLoaded", function () {
 						centerY: lastY,
 						radius: radius,
 						color: currentColor,
-						lineWidth: currentWidth,
+						lineWidth: currentWidth, // Change width to lineWidth to avoid conflict
 					});
 					break;
 			}
 		}
-
-		// Save the current state for undo/redo
-		saveState();
 
 		// If text tool is selected, prompt for text input
 		if (currentTool === "text") {
@@ -285,6 +338,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		switch (data.tool) {
 			case "brush":
+				ctx.globalCompositeOperation = "source-over"; // Ensure normal drawing mode
 				ctx.strokeStyle = data.color;
 				ctx.globalAlpha = data.opacity; // Set opacity from the event
 				ctx.beginPath();
@@ -296,12 +350,38 @@ document.addEventListener("DOMContentLoaded", function () {
 			case "eraser":
 				// Set composite operation to destination-out for erasing
 				ctx.globalCompositeOperation = "destination-out";
+				
+				// If we have both start and end positions, draw a line for continuous erasing
+				if (data.startX !== undefined && data.startY !== undefined && 
+					data.endX !== undefined && data.endY !== undefined) {
+					ctx.lineWidth = data.width;
+					ctx.strokeStyle = "rgba(255,255,255,1)"; // Color doesn't matter with destination-out
+					ctx.beginPath();
+					ctx.moveTo(data.startX, data.startY);
+					ctx.lineTo(data.endX, data.endY);
+					ctx.stroke();
+				}
+				
+				// Also draw a circle for spot erasing (either at end point or provided position)
 				ctx.beginPath();
-				ctx.arc(data.startX, data.startY, data.width / 2, 0, Math.PI * 2, false);
+				const eraserX = data.endX || data.startX;
+				const eraserY = data.endY || data.startY;
+				ctx.arc(eraserX, eraserY, data.width / 2, 0, Math.PI * 2, false);
 				ctx.fill();
+				
+				// Immediately save state to update canvas for other users
+				if (Math.random() < 0.2) { // Save occasionally to avoid performance issues
+					saveState();
+				}
+				
+				ctx.globalCompositeOperation = "source-over"; // Reset after erasing
 				break;
 
 			case "line":
+				ctx.globalCompositeOperation = "source-over"; // Ensure normal drawing mode
+				ctx.strokeStyle = data.color;
+				ctx.lineWidth = data.lineWidth || data.width;
+				ctx.fillStyle = "transparent";
 				ctx.beginPath();
 				ctx.moveTo(data.startX, data.startY);
 				ctx.lineTo(data.endX, data.endY);
@@ -310,6 +390,10 @@ document.addEventListener("DOMContentLoaded", function () {
 				break;
 
 			case "rectangle":
+				ctx.globalCompositeOperation = "source-over"; // Ensure normal drawing mode
+				ctx.strokeStyle = data.color;
+				ctx.lineWidth = data.lineWidth || data.width;
+				ctx.fillStyle = "transparent";
 				ctx.beginPath();
 				ctx.rect(data.startX, data.startY, data.width, data.height);
 				ctx.stroke();
@@ -317,6 +401,10 @@ document.addEventListener("DOMContentLoaded", function () {
 				break;
 
 			case "circle":
+				ctx.globalCompositeOperation = "source-over"; // Ensure normal drawing mode
+				ctx.strokeStyle = data.color;
+				ctx.lineWidth = data.lineWidth || data.width;
+				ctx.fillStyle = "transparent";
 				ctx.beginPath();
 				ctx.arc(data.centerX, data.centerY, data.radius, 0, Math.PI * 2);
 				ctx.stroke();
@@ -324,12 +412,17 @@ document.addEventListener("DOMContentLoaded", function () {
 				break;
 
 			case "text":
+				ctx.globalCompositeOperation = "source-over"; // Ensure normal drawing mode
 				ctx.font = `${data.fontSize}px Arial`;
 				ctx.fillStyle = data.color;
 				ctx.fillText(data.text, data.x, data.y);
 				saveState();
 				break;
 		}
+		
+		// Reset composite operation after any drawing operation
+		ctx.globalCompositeOperation = "source-over";
+		ctx.globalAlpha = 1;
 	});
 
 	// Handle clear canvas event
@@ -342,18 +435,55 @@ document.addEventListener("DOMContentLoaded", function () {
 	canvas.addEventListener("mousedown", startDrawing);
 	canvas.addEventListener("mousemove", (e) => {
 		draw(e);
-		updateEraserCursor(e);
+		// Only update eraser cursor if the current tool is eraser
+		if (currentTool === "eraser") {
+			updateEraserCursor(e);
+		}
 	});
+
+	// Add global document mousemove listener to handle cursor outside canvas
+	document.addEventListener("mousemove", (e) => {
+		if (currentTool === "eraser") {
+			updateEraserCursor(e);
+		}
+	});
+
 	canvas.addEventListener("mouseup", stopDrawing);
 	canvas.addEventListener("mouseout", stopDrawing);
+
+	// Add mouseenter and mouseleave events for eraser cursor
+	canvas.addEventListener("mouseenter", (e) => {
+		if (currentTool === "eraser") {
+			const eraserCursor = document.getElementById("eraserCursor");
+			if (eraserCursor) {
+				eraserCursor.style.display = "block";
+				updateEraserCursor(e); // Update position immediately
+			}
+		}
+	});
+
+	canvas.addEventListener("mouseleave", () => {
+		// We now keep the cursor visible even when leaving canvas
+		// so we can see it coming back to the canvas
+		// but only if we're using the eraser tool
+		if (currentTool !== "eraser") {
+			const eraserCursor = document.getElementById("eraserCursor");
+			if (eraserCursor) {
+				eraserCursor.style.display = "none";
+			}
+		}
+	});
 
 	// Update eraser cursor position and size
 	function updateEraserCursor(e) {
 		if (currentTool === "eraser") {
 			const eraserCursor = document.getElementById("eraserCursor");
+			if (!eraserCursor) return;
+			
 			const rect = canvas.getBoundingClientRect();
-			const x = e.clientX - rect.left;
-			const y = e.clientY - rect.top;
+			// Calculate the cursor position relative to the page, not just the canvas
+			const x = e.clientX;
+			const y = e.clientY;
 			const size = parseInt(eraserSizeSelect.value);
 
 			eraserCursor.style.display = "block";
@@ -362,8 +492,14 @@ document.addEventListener("DOMContentLoaded", function () {
 			eraserCursor.style.left = `${x}px`;
 			eraserCursor.style.top = `${y}px`;
 			eraserCursor.style.borderColor = `rgba(0,0,0,${size > 20 ? 0.8 : 0.5})`;
+			
+			// Make sure this cursor doesn't interfere with canvas events
+			eraserCursor.style.pointerEvents = "none";
 		} else {
-			document.getElementById("eraserCursor").style.display = "none";
+			const eraserCursor = document.getElementById("eraserCursor");
+			if (eraserCursor) {
+				eraserCursor.style.display = "none";
+			}
 		}
 	}
 
@@ -401,7 +537,6 @@ document.addEventListener("DOMContentLoaded", function () {
 	const brushSizeSlider = document.getElementById("brushSizeSlider");
 	const brushOpacitySlider = document.getElementById("brushOpacity");
 	const eraserSettings = document.getElementById("eraserSettings");
-	const eraserSizeSelect = document.getElementById("eraserSize");
 	const eraserBtn = document.getElementById("eraserBtn");
 	// const eraserCursor = document.getElementById("eraserCursor");
 	const eraserSizeSlider = document.getElementById("eraserSize");
@@ -431,35 +566,103 @@ document.addEventListener("DOMContentLoaded", function () {
 			// Set current tool
 			currentTool = button.dataset.tool;
 
-			// Show brush settings if brush tool is selected
-			if (currentTool === "brush") {
-				brushSettingsPopup.style.display = "block";
+			// Update canvas class to indicate eraser is active or not
+			if (currentTool === "eraser") {
+				canvas.classList.add("eraser-active");
 			} else {
-				brushSettingsPopup.style.display = "none";
+				canvas.classList.remove("eraser-active");
 			}
 
-			// Show eraser settings if eraser tool is selected
+			// Hide all settings panels first
+			brushSettingsPopup.style.display = "none";
+			eraserSettings.style.display = "none";
+			const lineSettings = document.getElementById("lineSettings");
+			const rectangleSettings = document.getElementById("rectangleSettings");
+			const circleSettings = document.getElementById("circleSettings");
+			lineSettings.style.display = "none";
+			rectangleSettings.style.display = "none";
+			circleSettings.style.display = "none";
+
+			// Explicitly hide eraser cursor when switching tools
+			const eraserCursor = document.getElementById("eraserCursor");
+			if (eraserCursor) {
+				eraserCursor.style.display = currentTool === "eraser" ? "block" : "none";
+				
+				// If eraser is selected, position the cursor at the current mouse position
+				if (currentTool === "eraser") {
+					// Get last known mouse position or use center of canvas as fallback
+					const lastMouseEvent = window.lastMouseEvent || {
+						clientX: window.innerWidth / 2,
+						clientY: window.innerHeight / 2
+					};
+					updateEraserCursor(lastMouseEvent);
+				}
+			}
+
+			// Show settings for selected tool
+			switch (currentTool) {
+				case "brush":
+					brushSettingsPopup.style.display = "block";
+					break;
+				case "line":
+					lineSettings.style.display = "block";
+					break;
+				case "rectangle":
+					rectangleSettings.style.display = "block";
+					break;
+				case "circle":
+					circleSettings.style.display = "block";
+					break;
+				case "eraser":
+					eraserSettings.style.display = "block";
+					break;
+			}
+
 			if (currentTool === "eraser") {
+				// Remove active class from all action tools
+				document.querySelectorAll(".action-tools .tool").forEach((tool) => {
+					tool.classList.remove("active");
+				});
+
 				eraserSettings.style.display = "block";
 				const eraserSize = parseInt(eraserSizeSlider.value);
 				const cursorSize = Math.max(10, eraserSize * 0.5); // Minimum size of 10px
 				canvas.style.cursor = `none`;
-				const eraserCursor = document.getElementById("eraserCursor");
 				if (eraserCursor) {
+					eraserCursor.style.display = "block";
 					eraserCursor.style.width = `${cursorSize}px`;
-					eraserCursor.style.height = `${cursorSize}px`;
+					eraserCursor.style.height = cursorSize + "px";
 				}
 			} else {
-				eraserSettings.style.display = "none";
 				canvas.style.cursor = "default";
+				if (eraserCursor) {
+					eraserCursor.style.display = "none";
+				}
+				// Stop any active drawing
+				if (isDrawing) {
+					stopDrawing({ clientX: 0, clientY: 0 });
+				}
 			}
 		});
 	});
 
+	// Track mouse position for eraser positioning
+	window.lastMouseEvent = null;
+	document.addEventListener("mousemove", (e) => {
+		window.lastMouseEvent = e;
+	});
+
 	// Color picker
 	const colorPicker = document.getElementById("colorPicker");
-	colorPicker.addEventListener("input", () => {
-		currentColor = colorPicker.value;
+	colorPicker.addEventListener("input", (e) => {
+		currentColor = e.target.value;
+		ctx.strokeStyle = currentColor; // Immediately update the strokeStyle
+	});
+
+	// Add color picker change event for completion
+	colorPicker.addEventListener("change", (e) => {
+		currentColor = e.target.value;
+		ctx.strokeStyle = currentColor;
 	});
 
 	// Stroke width
@@ -661,7 +864,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	document.getElementById("saveBtn").addEventListener("click", () => {
 		// Create a temporary link element
 		const link = document.createElement("a");
-		link.download = `${roomName}.png`;
+		link.download = roomName + ".png";
 		link.href = canvas.toDataURL("image/png");
 
 		// Trigger download
@@ -678,7 +881,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		const toastMessage = document.getElementById("toastMessage");
 
 		toastMessage.textContent = message;
-		toast.className = `toast ${type}`;
+		toast.className = "toast " + type;
 		toast.classList.add("active");
 
 		// Hide toast after 3 seconds
@@ -895,18 +1098,22 @@ document.addEventListener("DOMContentLoaded", function () {
 			// Clear canvas first to ensure we start fresh
 			ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+			// First pass: process all non-eraser events
+			const eraserEvents = [];
 			roomHistory.forEach((data) => {
+				if (data.tool === "eraser") {
+					eraserEvents.push(data);
+					return; // Skip eraser events in the first pass
+				}
+
+				// Reset context state
+				ctx.globalCompositeOperation = "source-over";
+				ctx.fillStyle = "transparent";
 				ctx.strokeStyle = data.color || "#000000";
-				ctx.lineWidth = data.width || data.lineWidth || 5;
+				ctx.lineWidth = data.width || 5;
 				ctx.lineCap = "round";
 				ctx.lineJoin = "round";
-
-				// Set opacity if available
-				if (data.opacity !== undefined) {
-					ctx.globalAlpha = data.opacity;
-				} else {
-					ctx.globalAlpha = 1.0;
-				}
+				ctx.globalAlpha = data.opacity !== undefined ? data.opacity : 1.0;
 
 				// Handle different tools
 				switch (data.tool) {
@@ -917,15 +1124,10 @@ document.addEventListener("DOMContentLoaded", function () {
 						ctx.stroke();
 						break;
 
-					case "eraser":
-						ctx.globalCompositeOperation = "destination-out";
-						ctx.beginPath();
-						ctx.arc(data.startX, data.startY, data.width / 2, 0, Math.PI * 2, false);
-						ctx.fill();
-						ctx.globalCompositeOperation = "source-over";
-						break;
-
 					case "line":
+						ctx.strokeStyle = data.color;
+						ctx.lineWidth = data.lineWidth || data.width || 5;
+						ctx.fillStyle = "transparent";
 						ctx.beginPath();
 						ctx.moveTo(data.startX, data.startY);
 						ctx.lineTo(data.endX, data.endY);
@@ -933,12 +1135,18 @@ document.addEventListener("DOMContentLoaded", function () {
 						break;
 
 					case "rectangle":
+						ctx.strokeStyle = data.color;
+						ctx.lineWidth = data.lineWidth || data.width || 5;
+						ctx.fillStyle = "transparent";
 						ctx.beginPath();
 						ctx.rect(data.startX, data.startY, data.width, data.height);
 						ctx.stroke();
 						break;
 
 					case "circle":
+						ctx.strokeStyle = data.color;
+						ctx.lineWidth = data.lineWidth || data.width || 5;
+						ctx.fillStyle = "transparent";
 						ctx.beginPath();
 						ctx.arc(data.centerX, data.centerY, data.radius, 0, Math.PI * 2);
 						ctx.stroke();
@@ -956,19 +1164,49 @@ document.addEventListener("DOMContentLoaded", function () {
 				ctx.globalCompositeOperation = "source-over";
 			});
 
+			// Second pass: apply eraser events
+			if (eraserEvents.length > 0) {
+				eraserEvents.forEach((data) => {
+					ctx.globalCompositeOperation = "destination-out";
+					
+					// Handle eraser with both line and spot erasing
+					if (data.startX !== undefined && data.startY !== undefined &&
+						data.endX !== undefined && data.endY !== undefined) {
+						// Line erasing for continuous motion
+						ctx.lineWidth = data.width;
+						ctx.strokeStyle = "rgba(255,255,255,1)"; // Color doesn't matter with destination-out
+					ctx.beginPath();
+						ctx.moveTo(data.startX, data.startY);
+						ctx.lineTo(data.endX, data.endY);
+						ctx.stroke();
+					}
+					
+					// Spot erasing with a circle
+					ctx.beginPath();
+					const eraserX = data.endX || data.startX;
+					const eraserY = data.endY || data.startY;
+					ctx.arc(eraserX, eraserY, data.width / 2, 0, Math.PI * 2, false);
+					ctx.fill();
+					
+					ctx.globalCompositeOperation = "source-over";
+				});
+			}
+
 			saveState();
+			connectionStatus.classList.remove("disconnected");
+			// connectionStatus.classList.add("connected");
+			connectionStatus.style.color;
 			showToast("Board loaded successfully", "success");
 		}
 
 		// Now that we have all data, send the userReady event
 		socket.emit("userReady", { roomId });
 
-		// Update connection status
-		const connectionStatus = document.getElementById("connectionStatus");
-		connectionStatus.innerHTML = '<i class="fas fa-circle connected"></i> Connected';
-
 		// Update document title
 		document.getElementById("pageTitle").textContent = roomName;
+
+		// Update connection UI
+		connectionStatus.innerHTML = '<i class="fas fa-circle connected"></i> Connected';
 	});
 
 	// Handle user joined
@@ -1009,6 +1247,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Update connection status
 	socket.on("connect", () => {
+		connectionStatus.classList.remove("disconnected");
+		connectionStatus.classList.add("connected");
 		console.log("Connected to server with socket ID:", socket.id);
 
 		// Get the user name before joining the room
@@ -1221,63 +1461,5 @@ document.addEventListener("DOMContentLoaded", function () {
 		document.getElementById("cancelExit").addEventListener("click", () => {
 			modal.remove();
 		});
-	}
-
-	// Initialize eraser functionality
-	let isEraserActive = false; // Move declaration to outer scope
-	if (eraserBtn && eraserCursor && eraserSizeControl && brushSizeSelect) {
-		eraserBtn.addEventListener("click", () => {
-			isEraserActive = !isEraserActive;
-			eraserBtn.classList.toggle("active");
-			canvas.classList.toggle("eraser-active");
-
-			// Add null checks before accessing style
-			try {
-				if (eraserCursor && eraserCursor.style) {
-					eraserCursor.style.display = isEraserActive ? "block" : "none";
-				}
-				if (brushSizeSelect && brushSizeSelect.style) {
-					brushSizeSelect.style.display = isEraserActive ? "none" : "block";
-				}
-				if (eraserSizeControl && eraserSizeControl.style) {
-					eraserSizeControl.style.display = isEraserActive ? "block" : "none";
-				}
-			} catch (error) {
-				console.error("Error updating eraser UI:", error);
-			}
-
-			if (isEraserActive) {
-				ctx.save();
-				ctx.globalCompositeOperation = "destination-out";
-				ctx.strokeStyle = "rgba(0,0,0,1)";
-				ctx.lineWidth = eraserSizeSlider?.value || 10;
-				canvas.addEventListener("mousemove", updateEraserCursor);
-			} else {
-				ctx.restore();
-				canvas.removeEventListener("mousemove", updateEraserCursor);
-			}
-		});
-	}
-
-	// Initialize eraser size control
-	if (eraserSizeSlider) {
-		eraserSizeSlider.addEventListener("input", () => {
-			if (isEraserActive && ctx) {
-				ctx.lineWidth = eraserSizeSlider.value;
-				updateEraserCursor({
-					pageX: parseInt(eraserCursor?.style.left) || 0,
-					pageY: parseInt(eraserCursor?.style.top) || 0,
-				});
-			}
-		});
-	}
-
-	function updateEraserCursor(e) {
-		if (!isEraserActive || !eraserCursor) return;
-		const size = eraserSizeSlider?.value || 10;
-		eraserCursor.style.width = size + "px";
-		eraserCursor.style.height = size + "px";
-		eraserCursor.style.left = e.pageX + "px";
-		eraserCursor.style.top = e.pageY + "px";
 	}
 });
