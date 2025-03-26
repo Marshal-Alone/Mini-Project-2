@@ -86,17 +86,17 @@ app.post("/api/register", async (req, res) => {
 		const existingUser = await User.findOne({ email });
 		if (existingUser) {
 			console.log(`Registration attempt with existing email: ${email}`);
-			return res.status(409).json({ error: "This email is already registered. Please try logging in instead." });
+			return res
+				.status(409)
+				.json({ error: "This email is already registered. Please try logging in instead." });
 		}
 
-		// Hash password
-		const hashedPassword = await bcrypt.hash(password, 10);
-
-		// Create new user
+		// Create new user with plain password
+		// (it will be hashed by the User model's pre-save middleware)
 		const user = new User({
 			fullName,
 			email,
-			password: hashedPassword,
+			password,
 		});
 
 		await user.save();
@@ -122,12 +122,14 @@ app.post("/api/register", async (req, res) => {
 		});
 	} catch (error) {
 		console.error("Registration error:", error);
-		
+
 		// Check specifically for MongoDB duplicate key error
 		if (error.code === 11000 && error.keyPattern && error.keyPattern.email) {
-			return res.status(409).json({ error: "This email is already registered. Please try logging in instead." });
+			return res
+				.status(409)
+				.json({ error: "This email is already registered. Please try logging in instead." });
 		}
-		
+
 		res.status(500).json({ error: "Registration failed. Please try again later." });
 	}
 });
@@ -160,7 +162,7 @@ app.post("/api/login", async (req, res) => {
 
 		// Create JWT token
 		const token = jwt.sign(
-			{ id: user._id, email: user.email },
+			{ id: user._id, email: user.email, name: user.fullName },
 			process.env.JWT_SECRET || "fallback_secret",
 			{ expiresIn: "24h" }
 		);
@@ -240,7 +242,7 @@ function generateSixDigitCode(roomId) {
 		console.log("Warning: Attempted to generate code for undefined or null roomId");
 		return "000000"; // Return a default code for null/undefined roomIds
 	}
-	
+
 	// Simple hash function to generate a numeric code from a string
 	let numericValue = 0;
 	for (let i = 0; i < roomId.length; i++) {
@@ -266,7 +268,7 @@ app.get("/api/boards/code/:code", async (req, res) => {
 		// Get all boards (ideally you would have a more efficient lookup)
 		const boards = await Board.find({});
 		console.log(`Found ${boards.length} boards to check against code ${code}`);
-		
+
 		if (boards.length === 0) {
 			console.log("No boards exist in the database");
 			return res.status(404).json({ error: "No boards found in the system" });
@@ -276,16 +278,16 @@ app.get("/api/boards/code/:code", async (req, res) => {
 		// We'll compute the 6-digit code for each board and check for a match
 		console.log("Checking each board for matching code:");
 		let validBoardsCount = 0;
-		
+
 		for (const board of boards) {
 			// Skip boards with missing roomId
 			if (!board.roomId) {
 				console.log(`Skipping board with id ${board._id} - missing roomId`);
 				continue;
 			}
-			
+
 			validBoardsCount++;
-			
+
 			try {
 				// Use the utility function to generate code
 				const boardCode = generateSixDigitCode(board.roomId);
@@ -306,7 +308,9 @@ app.get("/api/boards/code/:code", async (req, res) => {
 		}
 
 		// If no board found with that code
-		console.log(`No board found with code: ${code} after checking ${validBoardsCount} valid boards`);
+		console.log(
+			`No board found with code: ${code} after checking ${validBoardsCount} valid boards`
+		);
 		return res.status(404).json({ error: "Board not found with this code" });
 	} catch (error) {
 		console.error("Error finding board by code:", error);
@@ -315,13 +319,27 @@ app.get("/api/boards/code/:code", async (req, res) => {
 });
 
 // Socket.io connection handling
+// Socket.io optimization settings
+io.engine.pingInterval = 1000; // Reduced ping interval for faster reconnects
+io.engine.pingTimeout = 2000; // Shorter timeout
+
+// Configure socket middleware for performance
+io.use(async (socket, next) => {
+	socket.setMaxListeners(20); // Increase max listeners for better event handling
+	next();
+});
+
 io.on("connection", (socket) => {
+	// Set custom socket options for better performance
+	socket.conn.on("packet", (packet) => {
+		if (packet.type === "ping") socket.conn.packetsFn = []; // Clear packet buffer on ping
+	});
 	// a user connected
 	console.log("A user connected:", socket.id);
 
 	// Join a room
 	socket.on("joinRoom", async ({ roomId, userName, userId, password, hasLocalAuth }) => {
-		console.log(`User ${userName} (${userId || 'guest'}) attempting to join room ${roomId}`);
+		console.log(`User ${userName} (${userId || "guest"}) attempting to join room ${roomId}`);
 
 		try {
 			const boardForAuth = await Board.findOne({ roomId });
@@ -386,7 +404,12 @@ io.on("connection", (socket) => {
 			socket.roomId = roomId;
 
 			// Find or create board in the database
-			let board = await Board.findOne({ roomId }).select({ history: 1, name: 1, roomId: 1, createdBy: 1 });
+			let board = await Board.findOne({ roomId }).select({
+				history: 1,
+				name: 1,
+				roomId: 1,
+				createdBy: 1,
+			});
 
 			if (!board) {
 				console.log(`Creating new board for room ${roomId}`);
@@ -398,11 +421,15 @@ io.on("connection", (socket) => {
 				});
 				await board.save();
 			} else {
-				console.log(`Found existing board for room ${roomId} with ${board.history.length} history items`);
+				console.log(
+					`Found existing board for room ${roomId} with ${board.history.length} history items`
+				);
 			}
 
 			// Send board history from database to the new user
-			console.log(`Sending room data to user ${userName} with ${board.history.length} history items`);
+			console.log(
+				`Sending room data to user ${userName} with ${board.history.length} history items`
+			);
 			socket.emit("roomData", {
 				users: Object.values(rooms[roomId].users),
 				history: board.history || [],
@@ -573,9 +600,10 @@ io.on("connection", (socket) => {
 					},
 					{ new: true } // Return the updated document
 				);
-				
+
 				// Log occasional updates to track drawing activity
-				if (Math.random() < 0.01) { // Only log 1% of events to avoid spam
+				if (Math.random() < 0.01) {
+					// Only log 1% of events to avoid spam
 					console.log(`Drawing event saved for board ${roomId}, tool: ${data.tool}`);
 				}
 			}
@@ -654,18 +682,20 @@ io.on("connection", (socket) => {
 				console.log("Board sync requested with no roomId");
 				return;
 			}
-			
+
 			console.log(`Board sync requested for room ${roomId} by ${socket.id}`);
-			
+
 			// Get the latest board data from the database
 			const board = await Board.findOne({ roomId }).select({ history: 1 });
-			
+
 			if (board && board.history) {
-				console.log(`Sending board sync with ${board.history.length} history items to ${socket.id}`);
-				
+				console.log(
+					`Sending board sync with ${board.history.length} history items to ${socket.id}`
+				);
+
 				// Send the full history back to the requesting client
 				socket.emit("boardSync", {
-					history: board.history
+					history: board.history,
 				});
 			} else {
 				console.log(`No board found for sync request on room ${roomId}`);
