@@ -9,5 +9,5 @@ logs/
 *.log
 
 # Build output
-dist/
-build/
+# dist/
+# build/
