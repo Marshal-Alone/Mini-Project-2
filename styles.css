@@ -871,54 +871,48 @@ button:disabled {
     gap: 12px;
 }
 
-/* Fix for browser autofill styling */
+/* Complete removal of browser autofill styling */
 input:-webkit-autofill,
 input:-webkit-autofill:hover, 
 input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
-    -webkit-box-shadow: 0 0 0 30px white inset !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    -webkit-box-shadow: 0 0 0 1000px transparent inset !important;
+    box-shadow: 0 0 0 1000px transparent inset !important;
+    color: var(--text-color) !important;
     -webkit-text-fill-color: var(--text-color) !important;
-    transition: background-color 5000s ease-in-out 0s;
-    border-color: var(--border-color) !important;
+    transition: background-color 9999s ease-out 0s !important;
+    caret-color: var(--text-color) !important;
 }
 
-/* For input wrappers specifically - more precise targeting */
+/* Remove all other autofill related styles */
 .input-wrapper input:-webkit-autofill,
 .input-wrapper input:-webkit-autofill:hover, 
 .input-wrapper input:-webkit-autofill:focus,
-.input-wrapper input:-webkit-autofill:active {
-    -webkit-box-shadow: 0 0 0 30px rgba(99, 102, 241, 0.05) inset !important;
-    background-color: transparent !important;
-}
-
-/* Firefox specific fix */
+.input-wrapper input:-webkit-autofill:active,
 input:-moz-autofill,
-input:-moz-autofill:focus {
-    background-color: rgba(99, 102, 241, 0.05) !important;
+input:-moz-autofill:focus,
+.input-wrapper:has(input:-webkit-autofill) {
+    all: unset !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    -webkit-box-shadow: none !important;
     box-shadow: none !important;
-    color: var(--text-color) !important;
 }
 
-/* Fix for MS Edge browser */
-input::-ms-reveal,
-input::-ms-clear {
-    display: none;
+/* Force inputs to maintain their original styling */
+input {
+    background-color: transparent !important;
+    background-image: none !important;
 }
 
-/* Additional autofill fix for all browsers */
+/* Remove animation that might interfere */
 @keyframes autofillFix {
     to {
-        background: transparent;
-        color: var(--text-color);
+        background-color: transparent !important;
+        color: var(--text-color) !important;
     }
-}
-
-input:-webkit-autofill {
-    animation-name: autofillFix;
-    animation-fill-mode: both;
-}
-
-/* Ensure the input container maintains its style */
-.input-wrapper:has(input:-webkit-autofill) {
-    background: rgba(99, 102, 241, 0.05);
 }
