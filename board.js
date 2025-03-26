@@ -68,12 +68,12 @@ document.addEventListener("DOMContentLoaded", function () {
 		// Create a visual indicator for eraser size
 		const eraserSizeControl = document.getElementById("eraserSizeControl");
 		if (eraserSizeControl) {
-			eraserSizeControl.innerHTML = `<div class="size-indicator" style="width: ${defaultEraserSize}px; height: ${defaultEraserSize}px; border-radius: 50%; border: 1px solid #000; margin: 10px auto;"></div>`;
+			eraserSizeControl.innerHTML = `<div class="size-indicator" style=""display: none; width: ${defaultEraserSize}px; height: ${defaultEraserSize}px; border-radius: 50%; border: 1px solid #000; margin: 10px auto;"></div>`;
 			
 			// Update the visual indicator when slider changes
 			eraserSizeSelect.addEventListener("input", (e) => {
 				const size = parseInt(e.target.value);
-				eraserSizeControl.innerHTML = `<div class="size-indicator" style="width: ${size}px; height: ${size}px; border-radius: 50%; border: 1px solid #000; margin: 10px auto;"></div>`;
+				eraserSizeControl.innerHTML = `<div class="size-indicator" style="display: none; width: ${size}px; height: ${size}px; border-radius: 50%; border: 1px solid #000; margin: 10px auto;"></div>`;
 			});
 		}
 	}
@@ -576,12 +576,12 @@ document.addEventListener("DOMContentLoaded", function () {
 			// Hide all settings panels first
 			brushSettingsPopup.style.display = "none";
 			eraserSettings.style.display = "none";
-			const lineSettings = document.getElementById("lineSettings");
+			// const lineSettings = document.getElementById("lineSettings");
 			const rectangleSettings = document.getElementById("rectangleSettings");
 			const circleSettings = document.getElementById("circleSettings");
-			lineSettings.style.display = "none";
-			rectangleSettings.style.display = "none";
-			circleSettings.style.display = "none";
+			// lineSettings.style.display = "none";
+			// rectangleSettings.style.display = "none";
+			// circleSettings.style.display = "none";
 
 			// Explicitly hide eraser cursor when switching tools
 			const eraserCursor = document.getElementById("eraserCursor");
@@ -604,15 +604,15 @@ document.addEventListener("DOMContentLoaded", function () {
 				case "brush":
 					brushSettingsPopup.style.display = "block";
 					break;
-				case "line":
-					lineSettings.style.display = "block";
-					break;
-				case "rectangle":
-					rectangleSettings.style.display = "block";
-					break;
-				case "circle":
-					circleSettings.style.display = "block";
-					break;
+				// case "line":
+					// lineSettings.style.display = "block";
+					// break;
+				// case "rectangle":
+					// rectangleSettings.style.display = "block";
+					// break;
+				// case "circle":
+					// circleSettings.style.display = "block";
+					// break;
 				case "eraser":
 					eraserSettings.style.display = "block";
 					break;
@@ -747,6 +747,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Function to generate a 6-digit code from roomId
 	function generateSixDigitCode(roomId) {
+		// Check if roomId is null or undefined
+		if (!roomId) {
+			console.warn("Warning: Attempted to generate code for undefined or null roomId");
+			return "000000"; // Return a default code for null/undefined roomIds
+		}
+		
 		// Simple hash function to generate a numeric code from a string
 		let numericValue = 0;
 		for (let i = 0; i < roomId.length; i++) {

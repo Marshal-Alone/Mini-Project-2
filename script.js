@@ -142,6 +142,7 @@ document.addEventListener("DOMContentLoaded", function () {
 					// Show a loading indicator or message
 					startBoardingButton.disabled = true;
 					startBoardingButton.textContent = "Looking for board...";
+					console.log(`Attempting to find board with code: ${roomName}`);
 					
 					const response = await fetch(`/api/boards/code/${roomName}`);
 					
@@ -151,17 +152,21 @@ document.addEventListener("DOMContentLoaded", function () {
 					
 					if (response.ok) {
 						const data = await response.json();
+						console.log(`Board found with roomId: ${data.roomId}`);
 						// Redirect to the found board
 						window.location.href = `/board?room=${encodeURIComponent(
 							data.roomId
 						)}&name=${encodeURIComponent(data.name)}`;
 						return;
 					} else {
-						// If server responds but board not found
-						alert(`Board with code ${roomName} not found. Creating a new board instead.`);
+						// If server responds but board not found, show error and STOP
+						const data = await response.json();
+						console.error(`Error: ${data.error}`);
+						alert(`Board with code ${roomName} was not found. Please try a different code or enter a name for a new board.`);
+						return; // Stop execution here - don't create a new board
 					}
 				} catch (error) {
-					console.log("Error finding board by code:", error);
+					console.error("Error finding board by code:", error);
 					alert("Error connecting to server. Please try again.");
 					startBoardingButton.disabled = false;
 					startBoardingButton.textContent = "Start";
@@ -169,6 +174,9 @@ document.addEventListener("DOMContentLoaded", function () {
 				}
 			}
 
+			// Only reach here if it's NOT a 6-digit code
+			console.log("Creating a new board with name:", roomName);
+			
 			// Check if user is authenticated
 			const user = await checkAuth();
 			if (user) {

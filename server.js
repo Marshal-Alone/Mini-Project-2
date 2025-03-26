@@ -222,38 +222,81 @@ app.get("/api/boards", authenticateToken, async (req, res) => {
 	}
 });
 
+// Utility function to generate 6-digit code - MUST match the client implementation exactly
+function generateSixDigitCode(roomId) {
+	// Check if roomId is null or undefined
+	if (!roomId) {
+		console.log("Warning: Attempted to generate code for undefined or null roomId");
+		return "000000"; // Return a default code for null/undefined roomIds
+	}
+	
+	// Simple hash function to generate a numeric code from a string
+	let numericValue = 0;
+	for (let i = 0; i < roomId.length; i++) {
+		numericValue += roomId.charCodeAt(i);
+	}
+
+	// Ensure it's exactly 6 digits by using modulo and padding
+	let sixDigitCode = ((numericValue % 900000) + 100000).toString();
+	return sixDigitCode;
+}
+
 // Add this new route to find board by 6-digit code
 app.get("/api/boards/code/:code", async (req, res) => {
 	try {
 		const { code } = req.params;
+		console.log(`Looking for board with code: ${code}`);
+
+		if (!code || !/^\d{6}$/.test(code)) {
+			console.log("Invalid board code format");
+			return res.status(400).json({ error: "Invalid board code format. Must be 6 digits." });
+		}
 
 		// Get all boards (ideally you would have a more efficient lookup)
 		const boards = await Board.find({});
+		console.log(`Found ${boards.length} boards to check against code ${code}`);
+		
+		if (boards.length === 0) {
+			console.log("No boards exist in the database");
+			return res.status(404).json({ error: "No boards found in the system" });
+		}
 
 		// Find the board with the matching code
 		// We'll compute the 6-digit code for each board and check for a match
+		console.log("Checking each board for matching code:");
+		let validBoardsCount = 0;
+		
 		for (const board of boards) {
-			// Use the same algorithm as in board.js to generate the code
-			let numericValue = 0;
-			const roomId = board.roomId;
-
-			for (let i = 0; i < roomId.length; i++) {
-				numericValue += roomId.charCodeAt(i);
+			// Skip boards with missing roomId
+			if (!board.roomId) {
+				console.log(`Skipping board with id ${board._id} - missing roomId`);
+				continue;
 			}
+			
+			validBoardsCount++;
+			
+			try {
+				// Use the utility function to generate code
+				const boardCode = generateSixDigitCode(board.roomId);
+				console.log(`Board "${board.name}" (roomId: ${board.roomId}) has code: ${boardCode}`);
 
-			const boardCode = ((numericValue % 900000) + 100000).toString();
-
-			if (boardCode === code) {
-				// Found the matching board
-				return res.status(200).json({
-					roomId: board.roomId,
-					name: board.name,
-				});
+				if (boardCode === code) {
+					// Found the matching board
+					console.log(`MATCH FOUND! Returning board with roomId: ${board.roomId}`);
+					return res.status(200).json({
+						roomId: board.roomId,
+						name: board.name,
+					});
+				}
+			} catch (err) {
+				console.error(`Error generating code for board ${board._id}:`, err);
+				// Continue to next board
 			}
 		}
 
 		// If no board found with that code
-		return res.status(404).json({ error: "Board not found" });
+		console.log(`No board found with code: ${code} after checking ${validBoardsCount} valid boards`);
+		return res.status(404).json({ error: "Board not found with this code" });
 	} catch (error) {
 		console.error("Error finding board by code:", error);
 		res.status(500).json({ error: "Server error" });
