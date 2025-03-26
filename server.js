@@ -66,53 +66,69 @@ app.post("/api/register", async (req, res) => {
 	try {
 		const { fullName, email, password } = req.body;
 
-		console.log("\n=== Registration attempt ===");
-		console.log("Email:", email);
-
-		// Check if user already exists
-		const existingUser = await User.findOne({ email });
-		console.log("Existing user found:", existingUser ? "Yes" : "No");
-
-		if (existingUser) {
-			return res.status(400).json({ error: "User already exists" });
+		// Validate input
+		if (!fullName || !email || !password) {
+			return res.status(400).json({ error: "All fields are required" });
 		}
 
-		// Create new user (password will be hashed by the pre-save middleware)
-		const user = await User.create({
+		// Validate email format
+		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+		if (!emailRegex.test(email)) {
+			return res.status(400).json({ error: "Please enter a valid email address" });
+		}
+
+		// Validate password length
+		if (password.length < 8) {
+			return res.status(400).json({ error: "Password must be at least 8 characters long" });
+		}
+
+		// Check if user already exists using findOne (more reliable than try-catch for duplicates)
+		const existingUser = await User.findOne({ email });
+		if (existingUser) {
+			console.log(`Registration attempt with existing email: ${email}`);
+			return res.status(409).json({ error: "This email is already registered. Please try logging in instead." });
+		}
+
+		// Hash password
+		const hashedPassword = await bcrypt.hash(password, 10);
+
+		// Create new user
+		const user = new User({
 			fullName,
 			email,
-			password, // Pass the plain password, let the model handle hashing
+			password: hashedPassword,
 		});
 
-		console.log("User created with ID:", user._id);
-		console.log("Saved hash in database:", user.password);
-		console.log("=== End Registration ===\n");
+		await user.save();
 
-		// Create token
+		// Create JWT token
 		const token = jwt.sign(
 			{ id: user._id, email: user.email, name: user.fullName },
-			process.env.JWT_SECRET,
-			{ expiresIn: "1d" }
+			process.env.JWT_SECRET || "fallback_secret",
+			{ expiresIn: "24h" }
 		);
 
-		// Set cookie
-		res.cookie("token", token, {
-			httpOnly: true,
-			maxAge: 24 * 60 * 60 * 1000, // 1 day
-		});
+		// Log new registration
+		console.log(`New user registered: ${email}`);
 
+		// Return user details and token
 		res.status(201).json({
-			message: "User registered successfully",
+			token,
 			user: {
 				id: user._id,
 				name: user.fullName,
 				email: user.email,
 			},
-			token,
 		});
 	} catch (error) {
 		console.error("Registration error:", error);
-		res.status(500).json({ error: "Server error" });
+		
+		// Check specifically for MongoDB duplicate key error
+		if (error.code === 11000 && error.keyPattern && error.keyPattern.email) {
+			return res.status(409).json({ error: "This email is already registered. Please try logging in instead." });
+		}
+		
+		res.status(500).json({ error: "Registration failed. Please try again later." });
 	}
 });
 
@@ -120,55 +136,50 @@ app.post("/api/login", async (req, res) => {
 	try {
 		const { email, password } = req.body;
 
-		console.log("\n=== Login attempt ===");
-		console.log("Email:", email);
+		// Validate input
+		if (!email || !password) {
+			return res.status(400).json({ error: "Email and password are required" });
+		}
 
-		// Get user
+		// Find user by email
 		const user = await User.findOne({ email });
-		console.log("User found:", user ? "Yes" : "No");
 
+		// Check if user exists
 		if (!user) {
-			return res.status(400).json({ error: "Invalid email or password" });
+			return res.status(401).json({ error: "Invalid email or password" });
 		}
 
-		console.log("User ID:", user._id);
-		console.log("Input password:", password);
-		console.log("Stored hash:", user.password);
+		// Compare passwords
+		const isPasswordValid = await bcrypt.compare(password, user.password);
 
-		// Check password
-		const validPassword = await bcrypt.compare(password, user.password);
-		console.log("Password match result:", validPassword);
-		console.log("=== End Login ===\n");
-
-		if (!validPassword) {
-			return res.status(400).json({ error: "Invalid email or password" });
+		if (!isPasswordValid) {
+			// Log failed login attempt
+			console.log(`Failed login attempt for email: ${email}`);
+			return res.status(401).json({ error: "Invalid email or password" });
 		}
 
-		// Create token
+		// Create JWT token
 		const token = jwt.sign(
-			{ id: user._id, email: user.email, name: user.fullName },
-			process.env.JWT_SECRET,
-			{ expiresIn: "1d" }
+			{ id: user._id, email: user.email },
+			process.env.JWT_SECRET || "fallback_secret",
+			{ expiresIn: "24h" }
 		);
 
-		// Set cookie
-		res.cookie("token", token, {
-			httpOnly: true,
-			maxAge: 24 * 60 * 60 * 1000, // 1 day
-		});
+		// Log successful login
+		console.log(`User logged in: ${email}`);
 
+		// Return user details and token
 		res.status(200).json({
-			message: "Login successful",
+			token,
 			user: {
 				id: user._id,
 				name: user.fullName,
 				email: user.email,
 			},
-			token,
 		});
 	} catch (error) {
 		console.error("Login error:", error);
-		res.status(500).json({ error: "Server error" });
+		res.status(500).json({ error: "Login failed. Please try again later." });
 	}
 });
 
@@ -310,7 +321,7 @@ io.on("connection", (socket) => {
 
 	// Join a room
 	socket.on("joinRoom", async ({ roomId, userName, userId, password, hasLocalAuth }) => {
-		console.log(`User ${userName} (${userId}) attempting to join room ${roomId}`);
+		console.log(`User ${userName} (${userId || 'guest'}) attempting to join room ${roomId}`);
 
 		try {
 			const boardForAuth = await Board.findOne({ roomId });
@@ -375,9 +386,10 @@ io.on("connection", (socket) => {
 			socket.roomId = roomId;
 
 			// Find or create board in the database
-			let board = await Board.findOne({ roomId });
+			let board = await Board.findOne({ roomId }).select({ history: 1, name: 1, roomId: 1, createdBy: 1 });
 
 			if (!board) {
+				console.log(`Creating new board for room ${roomId}`);
 				board = new Board({
 					roomId,
 					name: roomId, // Default name is the roomId
@@ -385,19 +397,22 @@ io.on("connection", (socket) => {
 					createdBy: userId || socketId,
 				});
 				await board.save();
+			} else {
+				console.log(`Found existing board for room ${roomId} with ${board.history.length} history items`);
 			}
 
 			// Send board history from database to the new user
+			console.log(`Sending room data to user ${userName} with ${board.history.length} history items`);
 			socket.emit("roomData", {
 				users: Object.values(rooms[roomId].users),
-				history: board.history,
+				history: board.history || [],
 			});
 
 			// Notify all clients about the new user
 			io.to(roomId).emit("userJoined", rooms[roomId].users[socketId]);
 			io.to(roomId).emit("userCount", Object.keys(rooms[roomId].users).length);
 
-			console.log(`User ${userName} joined room ${roomId}`);
+			console.log(`User ${userName} joined room ${roomId} successfully`);
 		} catch (error) {
 			console.error("Error joining room:", error);
 			socket.emit("error", { message: "Error joining room" });
@@ -539,6 +554,11 @@ io.on("connection", (socket) => {
 	socket.on("drawEvent", async (data) => {
 		const roomId = socket.roomId;
 
+		// Add timestamp if not present to ensure proper ordering
+		if (!data.timestamp) {
+			data.timestamp = Date.now();
+		}
+
 		// Broadcast to other users in the room
 		socket.to(roomId).emit("drawEvent", data);
 
@@ -550,11 +570,18 @@ io.on("connection", (socket) => {
 					{
 						$push: { history: data },
 						$set: { updatedAt: Date.now() },
-					}
+					},
+					{ new: true } // Return the updated document
 				);
+				
+				// Log occasional updates to track drawing activity
+				if (Math.random() < 0.01) { // Only log 1% of events to avoid spam
+					console.log(`Drawing event saved for board ${roomId}, tool: ${data.tool}`);
+				}
 			}
 		} catch (error) {
 			console.error("Error saving drawing event:", error);
+			socket.emit("error", { message: "Failed to save drawing event" });
 		}
 	});
 
@@ -617,6 +644,36 @@ io.on("connection", (socket) => {
 				delete rooms[roomId];
 				console.log(`Room ${roomId} is now empty and removed from memory`);
 			}
+		}
+	});
+
+	// Handle board sync requests
+	socket.on("requestBoardSync", async ({ roomId }) => {
+		try {
+			if (!roomId) {
+				console.log("Board sync requested with no roomId");
+				return;
+			}
+			
+			console.log(`Board sync requested for room ${roomId} by ${socket.id}`);
+			
+			// Get the latest board data from the database
+			const board = await Board.findOne({ roomId }).select({ history: 1 });
+			
+			if (board && board.history) {
+				console.log(`Sending board sync with ${board.history.length} history items to ${socket.id}`);
+				
+				// Send the full history back to the requesting client
+				socket.emit("boardSync", {
+					history: board.history
+				});
+			} else {
+				console.log(`No board found for sync request on room ${roomId}`);
+				socket.emit("error", { message: "Board not found for sync" });
+			}
+		} catch (error) {
+			console.error("Error syncing board:", error);
+			socket.emit("error", { message: "Error syncing board" });
 		}
 	});
 });

@@ -1,0 +1,179 @@
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h2>Create an Account</h2>
+            <p>Sign up to start collaborating with your team</p>
+        </div>
+        <div id="registerError" class="error-message" style="display: none;"></div>
+        <form id="registerForm" class="auth-form">
+            <div class="form-group">
+                <label for="fullName">Full Name</label>
+                <div class="input-wrapper">
+                    <i class="fas fa-user icon"></i>
+                    <input type="text" id="fullName" name="fullName" placeholder="Enter your name" required />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="register-email">Email</label>
+                <div class="input-wrapper">
+                    <i class="fas fa-envelope icon"></i>
+                    <input type="email" id="register-email" name="email" placeholder="Enter your email" required />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <div class="input-wrapper">
+                    <i class="fas fa-lock icon"></i>
+                    <input type="password" id="password" name="password" placeholder="Create a password" required />
+                </div>
+                <div class="password-strength" id="passwordStrength"></div>
+                <div class="password-requirements">Password must be at least 8 characters long</div>
+            </div>
+
+            <button id="registerButton" type="submit" class="btn btn-primary btn-block">Create Account</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Show error message function
+        const showError = (message) => {
+            const errorDiv = document.getElementById('registerError');
+            if (!errorDiv) return;
+            
+            // Special handling for duplicate email errors
+            if (message.includes("already registered")) {
+                // Show login link with the error message
+                errorDiv.innerHTML = `${message} <a href="login.html" class="error-action-link">Log in now</a>`;
+            } else {
+                errorDiv.textContent = message;
+            }
+            
+            errorDiv.style.display = 'block';
+            errorDiv.classList.add('visible');
+            
+            // Add shake animation for better visibility
+            errorDiv.style.animation = 'none';
+            setTimeout(() => {
+                errorDiv.style.animation = 'shake 0.5s ease-in-out';
+            }, 10);
+            
+            // For duplicate email errors, keep the message visible longer
+            const hideDelay = message.includes("already registered") ? 10000 : 5000;
+            
+            // Hide after delay
+            setTimeout(() => {
+                errorDiv.classList.remove('visible');
+                setTimeout(() => {
+                    errorDiv.style.display = 'none';
+                }, 300);
+            }, hideDelay);
+        };
+
+        // Password strength indicator
+        const passwordInput = document.getElementById('password');
+        const strengthMeter = document.getElementById('passwordStrength');
+        
+        if (passwordInput && strengthMeter) {
+            passwordInput.addEventListener('input', function() {
+                const value = passwordInput.value;
+                let strength = 0;
+                
+                if (value.length >= 8) strength += 1;
+                if (value.match(/[a-z]/) && value.match(/[A-Z]/)) strength += 1;
+                if (value.match(/\d/)) strength += 1;
+                if (value.match(/[^a-zA-Z\d]/)) strength += 1;
+                
+                switch (strength) {
+                    case 0:
+                        strengthMeter.className = 'password-strength';
+                        strengthMeter.textContent = '';
+                        break;
+                    case 1:
+                        strengthMeter.className = 'password-strength weak';
+                        strengthMeter.textContent = 'Weak';
+                        break;
+                    case 2:
+                        strengthMeter.className = 'password-strength medium';
+                        strengthMeter.textContent = 'Medium';
+                        break;
+                    case 3:
+                        strengthMeter.className = 'password-strength strong';
+                        strengthMeter.textContent = 'Strong';
+                        break;
+                    case 4:
+                        strengthMeter.className = 'password-strength very-strong';
+                        strengthMeter.textContent = 'Very Strong';
+                        break;
+                }
+            });
+        }
+
+        // Handle form submission
+        const registerForm = document.getElementById('registerForm');
+        if (registerForm) {
+            registerForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                // Get form values
+                const fullName = document.getElementById('fullName').value;
+                const email = document.getElementById('register-email').value;
+                const password = document.getElementById('password').value;
+                
+                // Basic validation
+                if (password.length < 8) {
+                    showError('Password must be at least 8 characters long!');
+                    return;
+                }
+                
+                // Update button state
+                const registerButton = document.getElementById('registerButton');
+                registerButton.disabled = true;
+                registerButton.textContent = 'Creating account...';
+                
+                try {
+                    // Send registration request
+                    const response = await fetch('/api/register', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ fullName, email, password }),
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        // Save user data and redirect
+                        localStorage.setItem('token', data.token);
+                        localStorage.setItem('user', JSON.stringify(data.user));
+                        window.location.href = '/';
+                    } else {
+                        // Check for specific error types
+                        if (response.status === 409) {
+                            // Focus the email field for duplicate email errors
+                            const emailField = document.getElementById('register-email');
+                            if (emailField) {
+                                emailField.focus();
+                                emailField.classList.add('error-field');
+                                setTimeout(() => emailField.classList.remove('error-field'), 3000);
+                            }
+                        }
+                        // Show error message from server
+                        showError(data.error || 'Registration failed. Please try again.');
+                    }
+                } catch (error) {
+                    // Show network error
+                    showError('Registration failed. Please check your connection and try again.');
+                } finally {
+                    // Reset button state
+                    registerButton.disabled = false;
+                    registerButton.textContent = 'Create Account';
+                }
+            });
+        }
+    });
+</script> 

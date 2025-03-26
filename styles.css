@@ -413,7 +413,7 @@ h1 {
 .form-group input:focus {
   outline: none;
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+  /* box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2); */
 }
 
 .form-group small {
@@ -722,4 +722,203 @@ input[type="range"]::-moz-range-thumb {
   50% { transform: rotate(10deg); }
   60% { transform: rotate(0deg); }
   100% { transform: rotate(0deg); }
+}
+
+/* Error message styles */
+.error-message {
+    background-color: rgba(255, 87, 87, 0.15);
+    color: #ff5757;
+    padding: 12px;
+    border-radius: 6px;
+    margin-bottom: 15px;
+    border-left: 4px solid #ff5757;
+    font-size: 14px;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    display: none;
+}
+
+.error-message.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Animation for error shake effect */
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+/* Password strength indicator */
+.password-strength {
+    height: 5px;
+    margin-top: 8px;
+    border-radius: 3px;
+    transition: all 0.3s ease;
+}
+
+.password-strength.weak {
+    background-color: #ff5757;
+    width: 25%;
+}
+
+.password-strength.medium {
+    background-color: #ffbd59;
+    width: 50%;
+}
+
+.password-strength.strong {
+    background-color: #75d13b;
+    width: 75%;
+}
+
+.password-strength.very-strong {
+    background-color: #36b37e;
+    width: 100%;
+}
+
+.password-strength.weak::after {
+    content: "Weak";
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #ff5757;
+    font-size: 0.75rem;
+}
+
+.password-strength.medium::after {
+    content: "Medium";
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #ffbd59;
+    font-size: 0.75rem;
+}
+
+.password-strength.strong::after {
+    content: "Strong";
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #75d13b;
+    font-size: 0.75rem;
+}
+
+.password-strength.very-strong::after {
+    content: "Very Strong";
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #36b37e;
+    font-size: 0.75rem;
+}
+
+.password-requirements {
+    font-size: 12px;
+    color: #888888;
+    margin-top: 5px;
+}
+
+/* Button loading state */
+button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* Modern modal styling */
+.modern-confirm-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modern-confirm-modal .modal-content {
+    background-color: white;
+    border-radius: 8px;
+    padding: 24px;
+    width: 400px;
+    max-width: 90%;
+    box-shadow: 0 4px 25px rgba(0, 0, 0, 0.1);
+}
+
+.modern-confirm-modal h3 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    color: #333;
+}
+
+.modern-confirm-modal p {
+    margin-bottom: 20px;
+    color: #666;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+/* Fix for browser autofill styling */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px white inset !important;
+    -webkit-text-fill-color: var(--text-color) !important;
+    transition: background-color 5000s ease-in-out 0s;
+    border-color: var(--border-color) !important;
+}
+
+/* For input wrappers specifically - more precise targeting */
+.input-wrapper input:-webkit-autofill,
+.input-wrapper input:-webkit-autofill:hover, 
+.input-wrapper input:-webkit-autofill:focus,
+.input-wrapper input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px rgba(99, 102, 241, 0.05) inset !important;
+    background-color: transparent !important;
+}
+
+/* Firefox specific fix */
+input:-moz-autofill,
+input:-moz-autofill:focus {
+    background-color: rgba(99, 102, 241, 0.05) !important;
+    box-shadow: none !important;
+    color: var(--text-color) !important;
+}
+
+/* Fix for MS Edge browser */
+input::-ms-reveal,
+input::-ms-clear {
+    display: none;
+}
+
+/* Additional autofill fix for all browsers */
+@keyframes autofillFix {
+    to {
+        background: transparent;
+        color: var(--text-color);
+    }
+}
+
+input:-webkit-autofill {
+    animation-name: autofillFix;
+    animation-fill-mode: both;
+}
+
+/* Ensure the input container maintains its style */
+.input-wrapper:has(input:-webkit-autofill) {
+    background: rgba(99, 102, 241, 0.05);
 }

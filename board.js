@@ -334,13 +334,21 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Handle received drawing events
 	socket.on("drawEvent", (data) => {
-		ctx.lineWidth = data.width; // Set line width
+		// Always save the current canvas state before applying new changes
+		const tempState = new Image();
+		tempState.src = canvas.toDataURL();
+		
+		// Set context properties for drawing
+		ctx.lineWidth = data.width || data.lineWidth || 5; // Ensure we have a line width
+		
+		// Reset context state to ensure clean drawing
+		ctx.globalCompositeOperation = "source-over";
+		ctx.globalAlpha = data.opacity !== undefined ? data.opacity : 1.0;
 
 		switch (data.tool) {
 			case "brush":
 				ctx.globalCompositeOperation = "source-over"; // Ensure normal drawing mode
-				ctx.strokeStyle = data.color;
-				ctx.globalAlpha = data.opacity; // Set opacity from the event
+				ctx.strokeStyle = data.color || "#000000";
 				ctx.beginPath();
 				ctx.moveTo(data.startX, data.startY);
 				ctx.lineTo(data.endX, data.endY);
@@ -368,61 +376,56 @@ document.addEventListener("DOMContentLoaded", function () {
 				const eraserY = data.endY || data.startY;
 				ctx.arc(eraserX, eraserY, data.width / 2, 0, Math.PI * 2, false);
 				ctx.fill();
-				
-				// Immediately save state to update canvas for other users
-				if (Math.random() < 0.2) { // Save occasionally to avoid performance issues
-					saveState();
-				}
-				
-				ctx.globalCompositeOperation = "source-over"; // Reset after erasing
 				break;
 
 			case "line":
 				ctx.globalCompositeOperation = "source-over"; // Ensure normal drawing mode
-				ctx.strokeStyle = data.color;
-				ctx.lineWidth = data.lineWidth || data.width;
+				ctx.strokeStyle = data.color || "#000000";
+				ctx.lineWidth = data.lineWidth || data.width || 5;
 				ctx.fillStyle = "transparent";
 				ctx.beginPath();
 				ctx.moveTo(data.startX, data.startY);
 				ctx.lineTo(data.endX, data.endY);
 				ctx.stroke();
-				saveState();
 				break;
 
 			case "rectangle":
 				ctx.globalCompositeOperation = "source-over"; // Ensure normal drawing mode
-				ctx.strokeStyle = data.color;
-				ctx.lineWidth = data.lineWidth || data.width;
+				ctx.strokeStyle = data.color || "#000000";
+				ctx.lineWidth = data.lineWidth || data.width || 5;
 				ctx.fillStyle = "transparent";
 				ctx.beginPath();
 				ctx.rect(data.startX, data.startY, data.width, data.height);
 				ctx.stroke();
-				saveState();
 				break;
 
 			case "circle":
 				ctx.globalCompositeOperation = "source-over"; // Ensure normal drawing mode
-				ctx.strokeStyle = data.color;
-				ctx.lineWidth = data.lineWidth || data.width;
+				ctx.strokeStyle = data.color || "#000000";
+				ctx.lineWidth = data.lineWidth || data.width || 5;
 				ctx.fillStyle = "transparent";
 				ctx.beginPath();
 				ctx.arc(data.centerX, data.centerY, data.radius, 0, Math.PI * 2);
 				ctx.stroke();
-				saveState();
 				break;
 
 			case "text":
 				ctx.globalCompositeOperation = "source-over"; // Ensure normal drawing mode
 				ctx.font = `${data.fontSize}px Arial`;
-				ctx.fillStyle = data.color;
+				ctx.fillStyle = data.color || "#000000";
 				ctx.fillText(data.text, data.x, data.y);
-				saveState();
 				break;
 		}
 		
-		// Reset composite operation after any drawing operation
+		// Reset context properties after drawing
 		ctx.globalCompositeOperation = "source-over";
 		ctx.globalAlpha = 1;
+		
+		// Save state after each received event to ensure history is updated
+		// but only save occasionally to prevent performance issues
+		if (Math.random() < 0.2) { // 20% chance to save state
+			saveState();
+		}
 	});
 
 	// Handle clear canvas event
@@ -1103,10 +1106,28 @@ document.addEventListener("DOMContentLoaded", function () {
 		if (roomHistory && roomHistory.length > 0) {
 			// Clear canvas first to ensure we start fresh
 			ctx.clearRect(0, 0, canvas.width, canvas.height);
+			console.log("Applying board history...");
+			
+			// Sort history by timestamp if available to ensure correct order
+			if (roomHistory[0].timestamp) {
+				roomHistory.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+			}
 
 			// First pass: process all non-eraser events
 			const eraserEvents = [];
+			
+			// Process in batches to improve performance
+			let processedCount = 0;
+			const totalEvents = roomHistory.length;
+			
 			roomHistory.forEach((data) => {
+				processedCount++;
+				
+				// Log progress for large histories
+				if (totalEvents > 100 && processedCount % 50 === 0) {
+					console.log(`Processing history: ${processedCount}/${totalEvents} events`);
+				}
+				
 				if (data.tool === "eraser") {
 					eraserEvents.push(data);
 					return; // Skip eraser events in the first pass
@@ -1116,7 +1137,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				ctx.globalCompositeOperation = "source-over";
 				ctx.fillStyle = "transparent";
 				ctx.strokeStyle = data.color || "#000000";
-				ctx.lineWidth = data.width || 5;
+				ctx.lineWidth = data.width || data.lineWidth || 5;
 				ctx.lineCap = "round";
 				ctx.lineJoin = "round";
 				ctx.globalAlpha = data.opacity !== undefined ? data.opacity : 1.0;
@@ -1131,7 +1152,7 @@ document.addEventListener("DOMContentLoaded", function () {
 						break;
 
 					case "line":
-						ctx.strokeStyle = data.color;
+						ctx.strokeStyle = data.color || "#000000";
 						ctx.lineWidth = data.lineWidth || data.width || 5;
 						ctx.fillStyle = "transparent";
 						ctx.beginPath();
@@ -1141,7 +1162,7 @@ document.addEventListener("DOMContentLoaded", function () {
 						break;
 
 					case "rectangle":
-						ctx.strokeStyle = data.color;
+						ctx.strokeStyle = data.color || "#000000";
 						ctx.lineWidth = data.lineWidth || data.width || 5;
 						ctx.fillStyle = "transparent";
 						ctx.beginPath();
@@ -1150,7 +1171,7 @@ document.addEventListener("DOMContentLoaded", function () {
 						break;
 
 					case "circle":
-						ctx.strokeStyle = data.color;
+						ctx.strokeStyle = data.color || "#000000";
 						ctx.lineWidth = data.lineWidth || data.width || 5;
 						ctx.fillStyle = "transparent";
 						ctx.beginPath();
@@ -1160,7 +1181,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 					case "text":
 						ctx.font = `${data.fontSize}px Arial`;
-						ctx.fillStyle = data.color;
+						ctx.fillStyle = data.color || "#000000";
 						ctx.fillText(data.text, data.x, data.y);
 						break;
 				}
@@ -1172,6 +1193,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 			// Second pass: apply eraser events
 			if (eraserEvents.length > 0) {
+				console.log(`Applying ${eraserEvents.length} eraser events`);
 				eraserEvents.forEach((data) => {
 					ctx.globalCompositeOperation = "destination-out";
 					
@@ -1198,10 +1220,11 @@ document.addEventListener("DOMContentLoaded", function () {
 				});
 			}
 
+			// Save the fully applied history as a state
+			console.log("History applied, saving state");
 			saveState();
 			connectionStatus.classList.remove("disconnected");
-			// connectionStatus.classList.add("connected");
-			connectionStatus.style.color;
+			connectionStatus.classList.add("connected");
 			showToast("Board loaded successfully", "success");
 		}
 
@@ -1468,4 +1491,134 @@ document.addEventListener("DOMContentLoaded", function () {
 			modal.remove();
 		});
 	}
+
+	// Add periodic sync to ensure all clients are up to date
+	const SYNC_INTERVAL = 30000; // 30 seconds
+	
+	// Request a sync of the latest board state from the server
+	function requestBoardSync() {
+		console.log("Requesting board sync...");
+		socket.emit("requestBoardSync", { roomId });
+	}
+	
+	// Setup periodic sync
+	let syncInterval;
+	
+	function setupSyncInterval() {
+		// Clear any existing interval
+		if (syncInterval) {
+			clearInterval(syncInterval);
+		}
+		
+		// Set up new interval
+		syncInterval = setInterval(requestBoardSync, SYNC_INTERVAL);
+		console.log("Board sync interval set up");
+	}
+	
+	// Handle board sync received from server
+	socket.on("boardSync", ({ history }) => {
+		console.log(`Received board sync with ${history.length} history items`);
+		
+		// Only apply if we have new history items
+		if (history && history.length > 0) {
+			// Clear canvas and apply the updated history
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
+			
+			// Sort history by timestamp if available to ensure correct order
+			if (history[0].timestamp) {
+				history.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+			}
+			
+			// Process history (simplified from roomData handler)
+			const eraserEvents = [];
+			
+			history.forEach((data) => {
+				if (data.tool === "eraser") {
+					eraserEvents.push(data);
+					return;
+				}
+				
+				// Apply drawing event
+				ctx.globalCompositeOperation = "source-over";
+				ctx.strokeStyle = data.color || "#000000";
+				ctx.lineWidth = data.width || data.lineWidth || 5;
+				ctx.globalAlpha = data.opacity !== undefined ? data.opacity : 1.0;
+				
+				switch (data.tool) {
+					case "brush":
+						ctx.beginPath();
+						ctx.moveTo(data.startX, data.startY);
+						ctx.lineTo(data.endX, data.endY);
+						ctx.stroke();
+						break;
+					case "line":
+						ctx.beginPath();
+						ctx.moveTo(data.startX, data.startY);
+						ctx.lineTo(data.endX, data.endY);
+						ctx.stroke();
+						break;
+					case "rectangle":
+						ctx.beginPath();
+						ctx.rect(data.startX, data.startY, data.width, data.height);
+						ctx.stroke();
+						break;
+					case "circle":
+						ctx.beginPath();
+						ctx.arc(data.centerX, data.centerY, data.radius, 0, Math.PI * 2);
+						ctx.stroke();
+						break;
+					case "text":
+						ctx.font = `${data.fontSize}px Arial`;
+						ctx.fillStyle = data.color || "#000000";
+						ctx.fillText(data.text, data.x, data.y);
+						break;
+				}
+			});
+			
+			// Apply eraser events after all drawing events
+			if (eraserEvents.length > 0) {
+				eraserEvents.forEach((data) => {
+					ctx.globalCompositeOperation = "destination-out";
+					
+					if (data.startX !== undefined && data.endY !== undefined) {
+						ctx.lineWidth = data.width;
+						ctx.beginPath();
+						ctx.moveTo(data.startX, data.startY);
+						ctx.lineTo(data.endX, data.endY);
+						ctx.stroke();
+					}
+					
+					ctx.beginPath();
+					const eraserX = data.endX || data.startX;
+					const eraserY = data.endY || data.startY;
+					ctx.arc(eraserX, eraserY, data.width / 2, 0, Math.PI * 2, false);
+					ctx.fill();
+				});
+			}
+			
+			// Reset context properties and save state
+			ctx.globalCompositeOperation = "source-over";
+			ctx.globalAlpha = 1.0;
+			saveState();
+			
+			showToast("Board synchronized", "info");
+		}
+	});
+	
+	// Start sync interval when connected
+	socket.on("connect", () => {
+		setupSyncInterval();
+	});
+	
+	// Setup sync interval also after roomData received
+	socket.on("roomData", () => {
+		setupSyncInterval();
+	});
+	
+	// Clear interval on disconnect
+	socket.on("disconnect", () => {
+		if (syncInterval) {
+			clearInterval(syncInterval);
+		}
+	});
 });
