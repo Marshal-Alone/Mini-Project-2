@@ -278,14 +278,26 @@ document.addEventListener("DOMContentLoaded", function () {
 			const email = document.getElementById("register-email")?.value;
 			const password = document.getElementById("password")?.value;
 
-			// Simple validation
+			// Get error message element
+			const errorMessage = document.querySelector('.error-message');
+			
+			// Simple validation with modern error display
 			if (!fullName || !email || !password) {
-				alert("Please fill out all fields");
+				errorMessage.textContent = "Please fill out all fields";
+				errorMessage.classList.add('visible');
 				return;
 			}
 
 			if (password.length < 8) {
-				alert("Password must be at least 8 characters long!");
+				errorMessage.textContent = "Password must be at least 8 characters long!";
+				errorMessage.classList.add('visible');
+				
+				// Highlight the password field as an error
+				const passwordField = document.getElementById('password');
+				passwordField.classList.add('error-field');
+				
+				// Focus on the password field
+				passwordField.focus();
 				return;
 			}
 
@@ -305,11 +317,20 @@ document.addEventListener("DOMContentLoaded", function () {
 					localStorage.setItem("user", JSON.stringify(data.user));
 					window.location.href = "/";
 				} else {
-					alert(data.error || "Registration failed. Please try again.");
+					errorMessage.textContent = data.error || "This email is already registered. Please use a different email or login instead.";
+					errorMessage.classList.add('visible');
+					
+					// Highlight the email field as an error
+					const emailField = document.getElementById('register-email');
+					emailField.classList.add('error-field');
+					
+					// Focus on the email field for better UX
+					emailField.focus();
 				}
 			} catch (error) {
 				console.error("Registration error:", error);
-				alert("Registration failed. Please try again.");
+				errorMessage.textContent = "Registration failed. Please try again.";
+				errorMessage.classList.add('visible');
 			}
 		});
 	}

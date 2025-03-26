@@ -6,7 +6,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	const eraserSizeControl = document.getElementById("eraserSizeControl");
 
 	// Check if required elements exist
-	if (!eraserCursor || !brushSizeSelect || !eraserSizeControl || !connectionStatus) {
+	if (!eraserCursor || !brushSizeSelect  || !connectionStatus) {
 		console.error("Required elements not found in DOM");
 		return;
 	}
@@ -68,12 +68,12 @@ document.addEventListener("DOMContentLoaded", function () {
 		// Create a visual indicator for eraser size
 		const eraserSizeControl = document.getElementById("eraserSizeControl");
 		if (eraserSizeControl) {
-			eraserSizeControl.innerHTML = `<div class="size-indicator" style=""display: none; width: ${defaultEraserSize}px; height: ${defaultEraserSize}px; border-radius: 50%; border: 1px solid #000; margin: 10px auto;"></div>`;
+			eraserSizeControl.innerHTML = `<div class="size-indicator" style="width: ${defaultEraserSize}px; height: ${defaultEraserSize}px; border-radius: 50%; border: 1px solid #000; margin: 10px auto;"></div>`;
 			
 			// Update the visual indicator when slider changes
 			eraserSizeSelect.addEventListener("input", (e) => {
 				const size = parseInt(e.target.value);
-				eraserSizeControl.innerHTML = `<div class="size-indicator" style="display: none; width: ${size}px; height: ${size}px; border-radius: 50%; border: 1px solid #000; margin: 10px auto;"></div>`;
+				eraserSizeControl.innerHTML = `<div class="size-indicator" style="width: ${size}px; height: ${size}px; border-radius: 50%; border: 1px solid #000; margin: 10px auto;"></div>`;
 			});
 		}
 	}
@@ -142,7 +142,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			case "brush":
 				ctx.globalCompositeOperation = "source-over"; // Ensure normal drawing mode
 				ctx.strokeStyle = currentColor;
-				ctx.globalAlpha = brushOpacitySlider.value / 100; // Use the selected opacity
+				// ctx.globalAlpha = brushOpacitySlider.value / 100; // Use the selected opacity
 				ctx.beginPath();
 				ctx.moveTo(lastX, lastY);
 				ctx.lineTo(currentX, currentY);
@@ -538,7 +538,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	const brushSettingsPopup = document.getElementById("brushSettings");
 	const brushColorInput = document.getElementById("brushColor");
 	const brushSizeSlider = document.getElementById("brushSizeSlider");
-	const brushOpacitySlider = document.getElementById("brushOpacity");
+	// const brushOpacitySlider = document.getElementById("brushOpacity");
 	const eraserSettings = document.getElementById("eraserSettings");
 	const eraserBtn = document.getElementById("eraserBtn");
 	// const eraserCursor = document.getElementById("eraserCursor");
@@ -580,8 +580,8 @@ document.addEventListener("DOMContentLoaded", function () {
 			brushSettingsPopup.style.display = "none";
 			eraserSettings.style.display = "none";
 			// const lineSettings = document.getElementById("lineSettings");
-			const rectangleSettings = document.getElementById("rectangleSettings");
-			const circleSettings = document.getElementById("circleSettings");
+			// const rectangleSettings = document.getElementById("rectangleSettings");
+			// const circleSettings = document.getElementById("circleSettings");
 			// lineSettings.style.display = "none";
 			// rectangleSettings.style.display = "none";
 			// circleSettings.style.display = "none";
@@ -1257,10 +1257,21 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Handle user left
 	socket.on("userLeft", (user) => {
+		// Check if user is null or undefined before trying to access properties
+		if (!user) {
+			console.warn("Received null or undefined user in userLeft event");
+			return;
+		}
+		
 		// Check if user is an object or just an ID
 		if (typeof user === "object") {
 			removeUserFromList(user.id);
-			showToast(`${user.name} left the board`, "info");
+			// Only show toast if we have a name
+			if (user.name) {
+				showToast(`${user.name} left the board`, "info");
+			} else {
+				showToast("A user left the board", "info");
+			}
 		} else {
 			// Backward compatibility for older version
 			removeUserFromList(user);
@@ -1417,6 +1428,11 @@ document.addEventListener("DOMContentLoaded", function () {
 	}
 
 	function removeUserFromList(userId) {
+		if (!userId) {
+			console.warn("Attempted to remove user with null/undefined ID");
+			return;
+		}
+		
 		const userItem = document.getElementById(`user-${userId}`);
 		if (userItem) {
 			userItem.remove();
@@ -1434,9 +1450,9 @@ document.addEventListener("DOMContentLoaded", function () {
 	});
 
 	// Update brush opacity
-	brushOpacitySlider.addEventListener("input", (e) => {
-		ctx.globalAlpha = e.target.value / 100; // Convert to 0-1 range
-	});
+	// brushOpacitySlider.addEventListener("input", (e) => {
+	// 	ctx.globalAlpha = e.target.value / 100; // Convert to 0-1 range
+	// });
 
 	// Update eraser size
 	eraserSizeSelect.addEventListener("change", (e) => {
@@ -1601,7 +1617,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			ctx.globalAlpha = 1.0;
 			saveState();
 			
-			showToast("Board synchronized", "info");
+			// showToast("Board synchronized", "info");
 		}
 	});
 	
