@@ -21,6 +21,8 @@ mongoose
 	.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/collaboard", {
 		useNewUrlParser: true,
 		useUnifiedTopology: true,
+		retryWrites: true,
+		w: 'majority'
 	})
 	.then(() => {
 		console.log("");
@@ -346,7 +348,7 @@ io.on("connection", (socket) => {
 		} catch (error) {
 			roomName = roomId;
 		}
-		console.log(`User ${userName} attempting to join room ${roomName}`);
+		// console.log(`User ${userName} attempting to join room ${roomName}`);
 
 		try {
 			const boardForAuth = await Board.findOne({ roomId });
@@ -448,7 +450,7 @@ io.on("connection", (socket) => {
 			io.to(roomId).emit("userJoined", rooms[roomId].users[socketId]);
 			io.to(roomId).emit("userCount", Object.keys(rooms[roomId].users).length);
 
-			console.log(`User ${userName} joined room ${roomName} successfully`);
+			// console.log(`User ${userName} joined room ${roomName} successfully`);
 		} catch (error) {
 			console.error("Error joining room:", error);
 			socket.emit("error", { message: "Error joining room" });
@@ -696,10 +698,10 @@ io.on("connection", (socket) => {
 	// Handle board sync requests
 	socket.on("requestBoardSync", async ({ roomId }) => {
 		try {
-			if (!roomId) {
-				// console.log("Board sync requested with no roomId");
-				return;
-			}
+			// if (!roomId) {
+			// 	// console.log("Board sync requested with no roomId");
+			// 	return;
+			// }
 
 			const userName = rooms[roomId]?.users[socket.id]?.name || "Unknown User";
 			// console.log(`Board sync requested for room ${roomId} by ${userName}`);

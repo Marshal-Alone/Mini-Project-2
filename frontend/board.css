@@ -283,9 +283,37 @@
   box-shadow: var(--shadow-lg);
   overflow: hidden;
   z-index: 100;
+  transform: translateX(0);
+  transition: transform 0.3s ease;
 }
 
+.users-panel.collapsed {
+  transform: translateX(calc(100% - 40px));
+  cursor: pointer;
+}
+
+.toggle-panel {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s ease;
+}
+
+/* Rotate the chevron icon when collapsed */
+.users-panel.collapsed .toggle-panel i {
+  transform: rotate(180deg);
+}
+
+/* Update panel header styles */
 .panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   padding: 0.75rem 1rem;
   background-color: var(--primary-color);
   color: white;

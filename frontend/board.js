@@ -1637,4 +1637,29 @@ document.addEventListener("DOMContentLoaded", function () {
 			clearInterval(syncInterval);
 		}
 	});
+
+	// Users panel toggle functionality
+	const usersPanel = document.getElementById('usersPanel');
+	const toggleButton = document.getElementById('toggleUsersPanel');
+	
+	// Panel should be visible by default, so we'll only check for explicitly collapsed state
+	const isPanelCollapsed = localStorage.getItem('usersPanelCollapsed') === 'true';
+	if (isPanelCollapsed) {
+		usersPanel.classList.add('collapsed');
+	}
+
+	// Toggle on button click
+	toggleButton.addEventListener('click', (e) => {
+		e.stopPropagation(); // Prevent event from bubbling
+		usersPanel.classList.toggle('collapsed');
+		localStorage.setItem('usersPanelCollapsed', usersPanel.classList.contains('collapsed'));
+	});
+
+	// Show panel when clicking anywhere on it while collapsed
+	usersPanel.addEventListener('click', (e) => {
+		if (usersPanel.classList.contains('collapsed')) {
+			usersPanel.classList.remove('collapsed');
+			localStorage.setItem('usersPanelCollapsed', false);
+		}
+	});
 });
