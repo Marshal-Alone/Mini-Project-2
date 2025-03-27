@@ -41,7 +41,7 @@ const io = new Server(server, {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use(express.static(path.join(__dirname)));
+app.use(express.static(path.join(__dirname, "../frontend")));
 
 // Store room data
 const rooms = {};
@@ -339,7 +339,14 @@ io.on("connection", (socket) => {
 
 	// Join a room
 	socket.on("joinRoom", async ({ roomId, userName, userId, password, hasLocalAuth }) => {
-		console.log(`User ${userName} (${userId || "guest"}) attempting to join room ${roomId}`);
+		let roomName;
+		try {
+			const board = await Board.findOne({ roomId });
+			roomName = board ? board.name : roomId;
+		} catch (error) {
+			roomName = roomId;
+		}
+		console.log(`User ${userName} attempting to join room ${roomName}`);
 
 		try {
 			const boardForAuth = await Board.findOne({ roomId });
@@ -421,15 +428,17 @@ io.on("connection", (socket) => {
 				});
 				await board.save();
 			} else {
-				console.log(
-					`Found existing board for room ${roomId} with ${board.history.length} history items`
-				);
+				console
+					.log
+					// `Found existing board for room ${roomId} with ${board.history.length} history items`
+					();
 			}
 
 			// Send board history from database to the new user
-			console.log(
-				`Sending room data to user ${userName} with ${board.history.length} history items`
-			);
+			console
+				.log
+				// `Sending room data to user ${userName} with ${board.history.length} history items`
+				();
 			socket.emit("roomData", {
 				users: Object.values(rooms[roomId].users),
 				history: board.history || [],
@@ -439,7 +448,7 @@ io.on("connection", (socket) => {
 			io.to(roomId).emit("userJoined", rooms[roomId].users[socketId]);
 			io.to(roomId).emit("userCount", Object.keys(rooms[roomId].users).length);
 
-			console.log(`User ${userName} joined room ${roomId} successfully`);
+			console.log(`User ${userName} joined room ${roomName} successfully`);
 		} catch (error) {
 			console.error("Error joining room:", error);
 			socket.emit("error", { message: "Error joining room" });
@@ -632,7 +641,8 @@ io.on("connection", (socket) => {
 						},
 					}
 				);
-				console.log(`Board ${roomId} cleared by ${socket.id}`);
+				const userName = rooms[roomId]?.users[socket.id]?.name || "Unknown User";
+				console.log(`Board cleared by ${userName}`);
 			} catch (error) {
 				console.error("Error clearing board history:", error);
 			}
@@ -640,11 +650,12 @@ io.on("connection", (socket) => {
 	});
 
 	// Handle disconnection
-	socket.on("disconnect", () => {
-		console.log("User disconnected:", socket.id);
+	socket.on("disconnect", async () => {
+		const roomId = socket.roomId;
+		const userName = rooms[roomId]?.users[socket.id]?.name || "Unknown User";
+		console.log(`User disconnected: ${userName}`);
 
 		// Find which room this socket was in
-		const roomId = socket.roomId;
 		if (roomId && rooms[roomId] && rooms[roomId].users) {
 			// Get user info before removing
 			const userInfo = rooms[roomId].users[socket.id];
@@ -670,7 +681,14 @@ io.on("connection", (socket) => {
 			// If room is empty, clean up (but don't delete from DB)
 			if (Object.keys(rooms[roomId].users).length === 0) {
 				delete rooms[roomId];
-				console.log(`Room ${roomId} is now empty and removed from memory`);
+				// Get board name if available
+				try {
+					const board = await Board.findOne({ roomId });
+					const roomName = board ? board.name : roomId;
+					console.log(`Room "${roomName}" is now empty and removed from memory`);
+				} catch (error) {
+					console.log(`Room ${roomId} is now empty and removed from memory`);
+				}
 			}
 		}
 	});
@@ -679,19 +697,21 @@ io.on("connection", (socket) => {
 	socket.on("requestBoardSync", async ({ roomId }) => {
 		try {
 			if (!roomId) {
-				console.log("Board sync requested with no roomId");
+				// console.log("Board sync requested with no roomId");
 				return;
 			}
 
-			console.log(`Board sync requested for room ${roomId} by ${socket.id}`);
+			const userName = rooms[roomId]?.users[socket.id]?.name || "Unknown User";
+			// console.log(`Board sync requested for room ${roomId} by ${userName}`);
 
 			// Get the latest board data from the database
 			const board = await Board.findOne({ roomId }).select({ history: 1 });
 
 			if (board && board.history) {
-				console.log(
-					`Sending board sync with ${board.history.length} history items to ${socket.id}`
-				);
+				console
+					.log
+					// `Sending board sync with ${board.history.length} history items to ${socket.id}`
+					();
 
 				// Send the full history back to the requesting client
 				socket.emit("boardSync", {
@@ -728,19 +748,19 @@ function getRandomColor() {
 
 // Routes
 app.get("/", (req, res) => {
-	res.sendFile(path.join(__dirname, "index.html"));
+	res.sendFile(path.join(__dirname, "../frontend/index.html"));
 });
 
 app.get("/board", (req, res) => {
-	res.sendFile(path.join(__dirname, "board.html"));
+	res.sendFile(path.join(__dirname, "../frontend/board.html"));
 });
 
 app.get("/login", (req, res) => {
-	res.sendFile(path.join(__dirname, "login.html"));
+	res.sendFile(path.join(__dirname, "../frontend/login.html"));
 });
 
 app.get("/register", (req, res) => {
-	res.sendFile(path.join(__dirname, "register.html"));
+	res.sendFile(path.join(__dirname, "../frontend/register.html"));
 });
 
 // Create test user if not exists

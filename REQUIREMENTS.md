@@ -4,6 +4,33 @@
 
 A real-time collaborative whiteboard web application that enables teams to brainstorm ideas, solve problems, and collaborate visually in a shared digital space. The platform supports multiple users working simultaneously on the same board, making it ideal for remote teams and distributed collaboration.
 
+## PROJECT STRUCTURE
+
+Basic Version/
+├── frontend/
+│ ├── _.html files (auth.html, board.html, index.html, login.html, page2.html, register.html)
+│ ├── _.css files (board-enhanced.css, board.css, styles.css)
+│ ├── board.js
+│ └── script.js
+│
+└── backend/
+├── functions/
+│ └── server.js
+├── config/
+│ └── db.js
+├── models/
+│ ├── Board.js
+│ └── User.js
+├── server.js
+├── package.json
+├── package-lock.json
+├── .env
+├── .env.example
+├── netlify.toml
+└── vercel.json
+
+After moving the files, we'll need to update the package.json to run both frontend and backend servers with 'nodemonstart' command.
+
 ## Current Features
 
 ### User Authentication System
