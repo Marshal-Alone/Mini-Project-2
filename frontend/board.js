@@ -37,6 +37,14 @@ document.addEventListener("DOMContentLoaded", function () {
 	let currentTool = "brush";
 	let currentColor = "#000000";
 	let currentWidth = 5; // Default brush size
+	let lastSaveTime = Date.now();
+	let toolSizes = {
+		brush: 5,
+		line: 2,
+		rectangle: 2,
+		circle: 2,
+		eraser: 30
+	};
 
 	// History for undo/redo
 	const history = [];
@@ -85,9 +93,15 @@ document.addEventListener("DOMContentLoaded", function () {
 			history.splice(historyIndex + 1);
 		}
 
+		// Limit history size to prevent memory issues
+		if (history.length > 50) {
+			history.shift();
+			historyIndex--;
+		}
+
 		// Create a new image from the canvas
 		const newState = new Image();
-		newState.src = canvas.toDataURL();
+		newState.src = canvas.toDataURL('image/png', 0.5); // Use compression for better performance
 
 		// Add to history once image is loaded
 		newState.onload = function () {
@@ -105,8 +119,33 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Add event listener for brush size selection
 	brushSizeSelect.addEventListener("change", (e) => {
-		currentWidth = parseInt(e.target.value);
+		toolSizes.brush = parseInt(e.target.value);
+		if (currentTool === "brush") {
+			currentWidth = toolSizes.brush;
+		}
 	});
+
+	// Add event listeners for other tool sizes
+	document.getElementById("lineSize")?.addEventListener("change", (e) => {
+		toolSizes.line = parseInt(e.target.value);
+		if (currentTool === "line") {
+			currentWidth = toolSizes.line;
+		}
+	});
+
+	document.getElementById("shapeSize")?.addEventListener("change", (e) => {
+		const size = parseInt(e.target.value);
+		toolSizes.rectangle = size;
+		toolSizes.circle = size;
+		if (currentTool === "rectangle" || currentTool === "circle") {
+			currentWidth = size;
+		}
+	});
+
+	// Update currentWidth when tool changes
+	function updateToolSize() {
+		currentWidth = toolSizes[currentTool];
+	}
 
 	// Drawing functions
 	function startDrawing(e) {
@@ -132,32 +171,82 @@ document.addEventListener("DOMContentLoaded", function () {
 		const currentX = e.clientX - rect.left;
 		const currentY = e.clientY - rect.top;
 
+		// Check if we should save state (every 10 seconds during long drawing sessions)
+		const currentTime = Date.now();
+		if (currentTime - lastSaveTime > 10000) { // 10 seconds
+			saveState();
+			lastSaveTime = currentTime;
+		}
+
 		// Set drawing styles
-		ctx.lineWidth = currentWidth; // Use the selected brush size
+		ctx.lineWidth = currentWidth;
 		ctx.lineCap = "round";
 		ctx.lineJoin = "round";
 
 		// Draw based on selected tool
 		switch (currentTool) {
 			case "brush":
-				ctx.globalCompositeOperation = "source-over"; // Ensure normal drawing mode
+				ctx.globalCompositeOperation = "source-over";
 				ctx.strokeStyle = currentColor;
-				// ctx.globalAlpha = brushOpacitySlider.value / 100; // Use the selected opacity
-				ctx.beginPath();
-				ctx.moveTo(lastX, lastY);
-				ctx.lineTo(currentX, currentY);
-				ctx.stroke();
+				ctx.lineWidth = currentWidth;
+				ctx.lineCap = "round";
+				ctx.lineJoin = "round";
+				
+				// Store points for smooth curve
+				if (!window.brushPoints) {
+					window.brushPoints = [];
+				}
+				
+				// Add current point
+				window.brushPoints.push({ x: currentX, y: currentY });
+				
+				// Keep only last 4 points for performance
+				if (window.brushPoints.length > 4) {
+					window.brushPoints.shift();
+				}
+				
+				// Draw smooth curve through points
+				if (window.brushPoints.length >= 2) {
+					ctx.beginPath();
+					ctx.moveTo(lastX, lastY);
+					
+					if (window.brushPoints.length === 2) {
+						// Draw line for 2 points
+						ctx.lineTo(currentX, currentY);
+					} else {
+						// Use bezier curve for smoother lines
+						let i = 0;
+						ctx.moveTo(window.brushPoints[0].x, window.brushPoints[0].y);
+						
+						for (i = 1; i < window.brushPoints.length - 2; i++) {
+							const xc = (window.brushPoints[i].x + window.brushPoints[i + 1].x) / 2;
+							const yc = (window.brushPoints[i].y + window.brushPoints[i + 1].y) / 2;
+							ctx.quadraticCurveTo(window.brushPoints[i].x, window.brushPoints[i].y, xc, yc);
+						}
+						
+						// Curve through the last two points
+						ctx.quadraticCurveTo(
+							window.brushPoints[i].x,
+							window.brushPoints[i].y,
+							window.brushPoints[i + 1].x,
+							window.brushPoints[i + 1].y
+						);
+					}
+					
+					ctx.stroke();
+				}
 
-				// Emit draw event to server
+				// Emit draw event with curve data
 				socket.emit("drawEvent", {
 					tool: "brush",
 					startX: lastX,
 					startY: lastY,
 					endX: currentX,
 					endY: currentY,
+					points: window.brushPoints.map(p => ({ x: p.x, y: p.y })),
 					color: currentColor,
 					width: currentWidth,
-					opacity: ctx.globalAlpha, // Send opacity
+					timestamp: Date.now()
 				});
 				break;
 
@@ -259,6 +348,9 @@ document.addEventListener("DOMContentLoaded", function () {
 	function stopDrawing(event) {
 		if (!isDrawing) return;
 		isDrawing = false;
+		
+		// Clear brush points
+		window.brushPoints = [];
 
 		// Save the current state
 		saveState();
@@ -347,12 +439,43 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		switch (data.tool) {
 			case "brush":
-				ctx.globalCompositeOperation = "source-over"; // Ensure normal drawing mode
+				ctx.globalCompositeOperation = "source-over";
 				ctx.strokeStyle = data.color || "#000000";
+				ctx.lineWidth = data.width;
+				ctx.lineCap = "round";
+				ctx.lineJoin = "round";
+				
+				// Draw smooth curve if points are provided
+				if (data.points && data.points.length >= 2) {
+					ctx.beginPath();
+					ctx.moveTo(data.points[0].x, data.points[0].y);
+					
+					if (data.points.length === 2) {
+						ctx.lineTo(data.points[1].x, data.points[1].y);
+					} else {
+						let i = 0;
+						for (i = 1; i < data.points.length - 2; i++) {
+							const xc = (data.points[i].x + data.points[i + 1].x) / 2;
+							const yc = (data.points[i].y + data.points[i + 1].y) / 2;
+							ctx.quadraticCurveTo(data.points[i].x, data.points[i].y, xc, yc);
+						}
+						
+						// Curve through the last two points
+						ctx.quadraticCurveTo(
+							data.points[i].x,
+							data.points[i].y,
+							data.points[i + 1].x,
+							data.points[i + 1].y
+						);
+					}
+					ctx.stroke();
+				} else {
+					// Fallback to simple line for backward compatibility
 				ctx.beginPath();
 				ctx.moveTo(data.startX, data.startY);
 				ctx.lineTo(data.endX, data.endY);
 				ctx.stroke();
+				}
 				break;
 
 			case "eraser":
@@ -568,6 +691,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 			// Set current tool
 			currentTool = button.dataset.tool;
+			updateToolSize();
 
 			// Update canvas class to indicate eraser is active or not
 			if (currentTool === "eraser") {

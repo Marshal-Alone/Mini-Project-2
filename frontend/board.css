@@ -527,3 +527,36 @@
     gap: 1rem;
     justify-content: center;
 }
+
+.style-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+.size-control {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.size-control label {
+    font-size: 0.8em;
+    color: #666;
+}
+
+.styled-select {
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: white;
+    font-size: 0.9em;
+    min-width: 100px;
+}
+
+.styled-select:focus {
+    outline: none;
+    border-color: #4a90e2;
+    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+}
