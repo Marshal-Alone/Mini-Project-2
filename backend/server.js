@@ -37,7 +37,7 @@ const server = http.createServer(app);
 const corsOptions = {
 	origin: process.env.NODE_ENV === 'production' 
 		? ['https://collaborative-whiteboard-z8ai.onrender.com']
-		: ['http://localhost:3000'],
+		: '*', // Allow all origins in development
 	methods: ['GET', 'POST', 'OPTIONS', 'PUT', 'DELETE'],
 	allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 	credentials: true,
@@ -48,8 +48,8 @@ const corsOptions = {
 // Apply CORS middleware before other middleware
 app.use((req, res, next) => {
 	const origin = req.headers.origin;
-	if (corsOptions.origin.includes(origin)) {
-		res.setHeader('Access-Control-Allow-Origin', origin);
+	if (process.env.NODE_ENV === 'development' || corsOptions.origin.includes(origin)) {
+		res.setHeader('Access-Control-Allow-Origin', origin || '*');
 	}
 	res.setHeader('Access-Control-Allow-Methods', corsOptions.methods.join(','));
 	res.setHeader('Access-Control-Allow-Headers', corsOptions.allowedHeaders.join(','));
