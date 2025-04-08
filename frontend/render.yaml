@@ -1,0 +1,8 @@
+services:
+  - type: static
+    name: collaboard-frontend
+    buildCommand: echo "No build step needed for static site"
+    staticPublishPath: .
+    envVars:
+      - key: NODE_ENV
+        value: production 

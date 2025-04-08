@@ -34,8 +34,11 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
 	cors: {
-		origin: "*",
+		origin: process.env.NODE_ENV === 'production' 
+			? [process.env.FRONTEND_URL, 'https://collaboard.onrender.com']
+			: '*',
 		methods: ["GET", "POST"],
+		credentials: true
 	},
 });
 
@@ -43,7 +46,27 @@ const io = new Server(server, {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use(express.static(path.join(__dirname, "../frontend")));
+
+// CORS middleware
+app.use((req, res, next) => {
+	const allowedOrigins = process.env.NODE_ENV === 'production'
+		? [process.env.FRONTEND_URL, 'https://collaboard.onrender.com']
+		: ['http://localhost:3000'];
+	
+	const origin = req.headers.origin;
+	if (allowedOrigins.includes(origin)) {
+		res.setHeader('Access-Control-Allow-Origin', origin);
+	}
+	res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+	res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+	res.setHeader('Access-Control-Allow-Credentials', 'true');
+	next();
+});
+
+// Serve static files in development only
+if (process.env.NODE_ENV !== 'production') {
+	app.use(express.static(path.join(__dirname, "../frontend")));
+}
 
 // Store room data
 const rooms = {};

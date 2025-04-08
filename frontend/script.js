@@ -1,3 +1,5 @@
+import config from './config.js';
+
 document.addEventListener("DOMContentLoaded", function () {
 	// Check if user is logged in
 	const checkAuth = async () => {
@@ -5,7 +7,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			const token = localStorage.getItem("token");
 			if (!token) return null;
 
-			const response = await fetch("/api/user", {
+			const response = await fetch(`${config.API_URL}/api/user`, {
 				headers: {
 					Authorization: `Bearer ${token}`,
 				},
@@ -144,7 +146,7 @@ document.addEventListener("DOMContentLoaded", function () {
 					startBoardingButton.textContent = "Looking for board...";
 					console.log(`Attempting to find board with code: ${roomName}`);
 					
-					const response = await fetch(`/api/boards/code/${roomName}`);
+					const response = await fetch(`${config.API_URL}/api/boards/code/${roomName}`);
 					
 					// Reset button state
 					startBoardingButton.disabled = false;
@@ -185,7 +187,7 @@ document.addEventListener("DOMContentLoaded", function () {
 					startBoardingButton.disabled = true;
 					startBoardingButton.textContent = "Creating board...";
 					
-					const response = await fetch("/api/boards", {
+					const response = await fetch(`${config.API_URL}/api/boards`, {
 						method: "POST",
 						headers: {
 							"Content-Type": "application/json",
@@ -230,7 +232,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			const password = document.getElementById("l-password").value;
 
 			try {
-				const response = await fetch("/api/login", {
+				const response = await fetch(`${config.API_URL}/api/login`, {
 					method: "POST",
 					headers: {
 						"Content-Type": "application/json",
@@ -302,7 +304,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			}
 
 			try {
-				const response = await fetch("/api/register", {
+				const response = await fetch(`${config.API_URL}/api/register`, {
 					method: "POST",
 					headers: {
 						"Content-Type": "application/json",
