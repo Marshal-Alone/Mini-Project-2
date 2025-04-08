@@ -35,7 +35,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
 	cors: {
 		origin: process.env.NODE_ENV === 'production' 
-			? [process.env.FRONTEND_URL, 'https://collaboard.onrender.com']
+			? [process.env.FRONTEND_URL,'https://collaborative-whiteboard-z8ai.onrender.com']
 			: '*',
 		methods: ["GET", "POST"],
 		credentials: true
@@ -50,7 +50,7 @@ app.use(cookieParser());
 // CORS middleware
 app.use((req, res, next) => {
 	const allowedOrigins = process.env.NODE_ENV === 'production'
-		? [process.env.FRONTEND_URL, 'https://collaboard.onrender.com']
+		? ['https://collaborative-whiteboard-z8ai.onrender.com']
 		: ['http://localhost:3000'];
 	
 	const origin = req.headers.origin;
