@@ -6,7 +6,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	const eraserSizeControl = document.getElementById("eraserSizeControl");
 
 	// Check if required elements exist
-	if (!eraserCursor || !brushSizeSelect  || !connectionStatus) {
+	if (!eraserCursor || !brushSizeSelect || !connectionStatus) {
 		console.error("Required elements not found in DOM");
 		return;
 	}
@@ -43,7 +43,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		line: 2,
 		rectangle: 2,
 		circle: 2,
-		eraser: 30
+		eraser: 30,
 	};
 
 	// History for undo/redo
@@ -72,12 +72,12 @@ document.addEventListener("DOMContentLoaded", function () {
 		// Default eraser size
 		const defaultEraserSize = 30;
 		eraserSizeSelect.value = defaultEraserSize;
-		
+
 		// Create a visual indicator for eraser size
 		const eraserSizeControl = document.getElementById("eraserSizeControl");
 		if (eraserSizeControl) {
 			eraserSizeControl.innerHTML = `<div class="size-indicator" style="width: ${defaultEraserSize}px; height: ${defaultEraserSize}px; border-radius: 50%; border: 1px solid #000; margin: 10px auto;"></div>`;
-			
+
 			// Update the visual indicator when slider changes
 			eraserSizeSelect.addEventListener("input", (e) => {
 				const size = parseInt(e.target.value);
@@ -101,7 +101,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		// Create a new image from the canvas
 		const newState = new Image();
-		newState.src = canvas.toDataURL('image/png', 0.5); // Use compression for better performance
+		newState.src = canvas.toDataURL("image/png", 0.5); // Use compression for better performance
 
 		// Add to history once image is loaded
 		newState.onload = function () {
@@ -173,7 +173,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		// Check if we should save state (every 10 seconds during long drawing sessions)
 		const currentTime = Date.now();
-		if (currentTime - lastSaveTime > 10000) { // 10 seconds
+		if (currentTime - lastSaveTime > 10000) {
+			// 10 seconds
 			saveState();
 			lastSaveTime = currentTime;
 		}
@@ -191,25 +192,25 @@ document.addEventListener("DOMContentLoaded", function () {
 				ctx.lineWidth = currentWidth;
 				ctx.lineCap = "round";
 				ctx.lineJoin = "round";
-				
+
 				// Store points for smooth curve
 				if (!window.brushPoints) {
 					window.brushPoints = [];
 				}
-				
+
 				// Add current point
 				window.brushPoints.push({ x: currentX, y: currentY });
-				
+
 				// Keep only last 4 points for performance
 				if (window.brushPoints.length > 4) {
 					window.brushPoints.shift();
 				}
-				
+
 				// Draw smooth curve through points
 				if (window.brushPoints.length >= 2) {
 					ctx.beginPath();
 					ctx.moveTo(lastX, lastY);
-					
+
 					if (window.brushPoints.length === 2) {
 						// Draw line for 2 points
 						ctx.lineTo(currentX, currentY);
@@ -217,13 +218,13 @@ document.addEventListener("DOMContentLoaded", function () {
 						// Use bezier curve for smoother lines
 						let i = 0;
 						ctx.moveTo(window.brushPoints[0].x, window.brushPoints[0].y);
-						
+
 						for (i = 1; i < window.brushPoints.length - 2; i++) {
 							const xc = (window.brushPoints[i].x + window.brushPoints[i + 1].x) / 2;
 							const yc = (window.brushPoints[i].y + window.brushPoints[i + 1].y) / 2;
 							ctx.quadraticCurveTo(window.brushPoints[i].x, window.brushPoints[i].y, xc, yc);
 						}
-						
+
 						// Curve through the last two points
 						ctx.quadraticCurveTo(
 							window.brushPoints[i].x,
@@ -232,7 +233,7 @@ document.addEventListener("DOMContentLoaded", function () {
 							window.brushPoints[i + 1].y
 						);
 					}
-					
+
 					ctx.stroke();
 				}
 
@@ -243,10 +244,10 @@ document.addEventListener("DOMContentLoaded", function () {
 					startY: lastY,
 					endX: currentX,
 					endY: currentY,
-					points: window.brushPoints.map(p => ({ x: p.x, y: p.y })),
+					points: window.brushPoints.map((p) => ({ x: p.x, y: p.y })),
 					color: currentColor,
 					width: currentWidth,
-					timestamp: Date.now()
+					timestamp: Date.now(),
 				});
 				break;
 
@@ -263,7 +264,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				ctx.moveTo(lastX, lastY);
 				ctx.lineTo(currentX, currentY);
 				ctx.stroke();
-				
+
 				// Also draw a circle at current position for spot erasing
 				ctx.beginPath();
 				ctx.arc(currentX, currentY, eraserSize / 2, 0, Math.PI * 2, false);
@@ -277,9 +278,9 @@ document.addEventListener("DOMContentLoaded", function () {
 					endX: currentX,
 					endY: currentY,
 					width: eraserSize,
-					timestamp: Date.now() // Add timestamp for sequencing
+					timestamp: Date.now(), // Add timestamp for sequencing
 				});
-				
+
 				// Save state after erasing occasionally to avoid performance issues
 				if (Math.random() < 0.05) {
 					saveState();
@@ -348,13 +349,13 @@ document.addEventListener("DOMContentLoaded", function () {
 	function stopDrawing(event) {
 		if (!isDrawing) return;
 		isDrawing = false;
-		
+
 		// Clear brush points
 		window.brushPoints = [];
 
 		// Save the current state
 		saveState();
-		
+
 		// Get current mouse position
 		const rect = canvas.getBoundingClientRect();
 		const currentX = event.clientX - rect.left;
@@ -429,10 +430,10 @@ document.addEventListener("DOMContentLoaded", function () {
 		// Always save the current canvas state before applying new changes
 		const tempState = new Image();
 		tempState.src = canvas.toDataURL();
-		
+
 		// Set context properties for drawing
 		ctx.lineWidth = data.width || data.lineWidth || 5; // Ensure we have a line width
-		
+
 		// Reset context state to ensure clean drawing
 		ctx.globalCompositeOperation = "source-over";
 		ctx.globalAlpha = data.opacity !== undefined ? data.opacity : 1.0;
@@ -444,12 +445,12 @@ document.addEventListener("DOMContentLoaded", function () {
 				ctx.lineWidth = data.width;
 				ctx.lineCap = "round";
 				ctx.lineJoin = "round";
-				
+
 				// Draw smooth curve if points are provided
 				if (data.points && data.points.length >= 2) {
 					ctx.beginPath();
 					ctx.moveTo(data.points[0].x, data.points[0].y);
-					
+
 					if (data.points.length === 2) {
 						ctx.lineTo(data.points[1].x, data.points[1].y);
 					} else {
@@ -459,7 +460,7 @@ document.addEventListener("DOMContentLoaded", function () {
 							const yc = (data.points[i].y + data.points[i + 1].y) / 2;
 							ctx.quadraticCurveTo(data.points[i].x, data.points[i].y, xc, yc);
 						}
-						
+
 						// Curve through the last two points
 						ctx.quadraticCurveTo(
 							data.points[i].x,
@@ -471,20 +472,24 @@ document.addEventListener("DOMContentLoaded", function () {
 					ctx.stroke();
 				} else {
 					// Fallback to simple line for backward compatibility
-				ctx.beginPath();
-				ctx.moveTo(data.startX, data.startY);
-				ctx.lineTo(data.endX, data.endY);
-				ctx.stroke();
+					ctx.beginPath();
+					ctx.moveTo(data.startX, data.startY);
+					ctx.lineTo(data.endX, data.endY);
+					ctx.stroke();
 				}
 				break;
 
 			case "eraser":
 				// Set composite operation to destination-out for erasing
 				ctx.globalCompositeOperation = "destination-out";
-				
+
 				// If we have both start and end positions, draw a line for continuous erasing
-				if (data.startX !== undefined && data.startY !== undefined && 
-					data.endX !== undefined && data.endY !== undefined) {
+				if (
+					data.startX !== undefined &&
+					data.startY !== undefined &&
+					data.endX !== undefined &&
+					data.endY !== undefined
+				) {
 					ctx.lineWidth = data.width;
 					ctx.strokeStyle = "rgba(255,255,255,1)"; // Color doesn't matter with destination-out
 					ctx.beginPath();
@@ -492,7 +497,7 @@ document.addEventListener("DOMContentLoaded", function () {
 					ctx.lineTo(data.endX, data.endY);
 					ctx.stroke();
 				}
-				
+
 				// Also draw a circle for spot erasing (either at end point or provided position)
 				ctx.beginPath();
 				const eraserX = data.endX || data.startX;
@@ -539,14 +544,15 @@ document.addEventListener("DOMContentLoaded", function () {
 				ctx.fillText(data.text, data.x, data.y);
 				break;
 		}
-		
+
 		// Reset context properties after drawing
 		ctx.globalCompositeOperation = "source-over";
 		ctx.globalAlpha = 1;
-		
+
 		// Save state after each received event to ensure history is updated
 		// but only save occasionally to prevent performance issues
-		if (Math.random() < 0.2) { // 20% chance to save state
+		if (Math.random() < 0.2) {
+			// 20% chance to save state
 			saveState();
 		}
 	});
@@ -605,7 +611,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		if (currentTool === "eraser") {
 			const eraserCursor = document.getElementById("eraserCursor");
 			if (!eraserCursor) return;
-			
+
 			const rect = canvas.getBoundingClientRect();
 			// Calculate the cursor position relative to the page, not just the canvas
 			const x = e.clientX;
@@ -618,7 +624,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			eraserCursor.style.left = `${x}px`;
 			eraserCursor.style.top = `${y}px`;
 			eraserCursor.style.borderColor = `rgba(0,0,0,${size > 20 ? 0.8 : 0.5})`;
-			
+
 			// Make sure this cursor doesn't interfere with canvas events
 			eraserCursor.style.pointerEvents = "none";
 		} else {
@@ -714,13 +720,13 @@ document.addEventListener("DOMContentLoaded", function () {
 			const eraserCursor = document.getElementById("eraserCursor");
 			if (eraserCursor) {
 				eraserCursor.style.display = currentTool === "eraser" ? "block" : "none";
-				
+
 				// If eraser is selected, position the cursor at the current mouse position
 				if (currentTool === "eraser") {
 					// Get last known mouse position or use center of canvas as fallback
 					const lastMouseEvent = window.lastMouseEvent || {
 						clientX: window.innerWidth / 2,
-						clientY: window.innerHeight / 2
+						clientY: window.innerHeight / 2,
 					};
 					updateEraserCursor(lastMouseEvent);
 				}
@@ -732,14 +738,14 @@ document.addEventListener("DOMContentLoaded", function () {
 					brushSettingsPopup.style.display = "block";
 					break;
 				// case "line":
-					// lineSettings.style.display = "block";
-					// break;
+				// lineSettings.style.display = "block";
+				// break;
 				// case "rectangle":
-					// rectangleSettings.style.display = "block";
-					// break;
+				// rectangleSettings.style.display = "block";
+				// break;
 				// case "circle":
-					// circleSettings.style.display = "block";
-					// break;
+				// circleSettings.style.display = "block";
+				// break;
 				case "eraser":
 					eraserSettings.style.display = "block";
 					break;
@@ -879,7 +885,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			console.warn("Warning: Attempted to generate code for undefined or null roomId");
 			return "000000"; // Return a default code for null/undefined roomIds
 		}
-		
+
 		// Simple hash function to generate a numeric code from a string
 		let numericValue = 0;
 		for (let i = 0; i < roomId.length; i++) {
@@ -1231,7 +1237,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			// Clear canvas first to ensure we start fresh
 			ctx.clearRect(0, 0, canvas.width, canvas.height);
 			console.log("Applying board history...");
-			
+
 			// Sort history by timestamp if available to ensure correct order
 			if (roomHistory[0].timestamp) {
 				roomHistory.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
@@ -1239,19 +1245,19 @@ document.addEventListener("DOMContentLoaded", function () {
 
 			// First pass: process all non-eraser events
 			const eraserEvents = [];
-			
+
 			// Process in batches to improve performance
 			let processedCount = 0;
 			const totalEvents = roomHistory.length;
-			
+
 			roomHistory.forEach((data) => {
 				processedCount++;
-				
+
 				// Log progress for large histories
 				if (totalEvents > 100 && processedCount % 50 === 0) {
 					console.log(`Processing history: ${processedCount}/${totalEvents} events`);
 				}
-				
+
 				if (data.tool === "eraser") {
 					eraserEvents.push(data);
 					return; // Skip eraser events in the first pass
@@ -1320,26 +1326,30 @@ document.addEventListener("DOMContentLoaded", function () {
 				console.log(`Applying ${eraserEvents.length} eraser events`);
 				eraserEvents.forEach((data) => {
 					ctx.globalCompositeOperation = "destination-out";
-					
+
 					// Handle eraser with both line and spot erasing
-					if (data.startX !== undefined && data.startY !== undefined &&
-						data.endX !== undefined && data.endY !== undefined) {
+					if (
+						data.startX !== undefined &&
+						data.startY !== undefined &&
+						data.endX !== undefined &&
+						data.endY !== undefined
+					) {
 						// Line erasing for continuous motion
 						ctx.lineWidth = data.width;
 						ctx.strokeStyle = "rgba(255,255,255,1)"; // Color doesn't matter with destination-out
-					ctx.beginPath();
+						ctx.beginPath();
 						ctx.moveTo(data.startX, data.startY);
 						ctx.lineTo(data.endX, data.endY);
 						ctx.stroke();
 					}
-					
+
 					// Spot erasing with a circle
 					ctx.beginPath();
 					const eraserX = data.endX || data.startX;
 					const eraserY = data.endY || data.startY;
 					ctx.arc(eraserX, eraserY, data.width / 2, 0, Math.PI * 2, false);
 					ctx.fill();
-					
+
 					ctx.globalCompositeOperation = "source-over";
 				});
 			}
@@ -1386,7 +1396,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			console.warn("Received null or undefined user in userLeft event");
 			return;
 		}
-		
+
 		// Check if user is an object or just an ID
 		if (typeof user === "object") {
 			removeUserFromList(user.id);
@@ -1556,7 +1566,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			console.warn("Attempted to remove user with null/undefined ID");
 			return;
 		}
-		
+
 		const userItem = document.getElementById(`user-${userId}`);
 		if (userItem) {
 			userItem.remove();
@@ -1634,56 +1644,56 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Add periodic sync to ensure all clients are up to date
 	const SYNC_INTERVAL = 30000; // 30 seconds
-	
+
 	// Request a sync of the latest board state from the server
 	function requestBoardSync() {
 		console.log("Requesting board sync...");
 		socket.emit("requestBoardSync", { roomId });
 	}
-	
+
 	// Setup periodic sync
 	let syncInterval;
-	
+
 	function setupSyncInterval() {
 		// Clear any existing interval
 		if (syncInterval) {
 			clearInterval(syncInterval);
 		}
-		
+
 		// Set up new interval
 		syncInterval = setInterval(requestBoardSync, SYNC_INTERVAL);
 		console.log("Board sync interval set up");
 	}
-	
+
 	// Handle board sync received from server
 	socket.on("boardSync", ({ history }) => {
 		console.log(`Received board sync with ${history.length} history items`);
-		
+
 		// Only apply if we have new history items
 		if (history && history.length > 0) {
 			// Clear canvas and apply the updated history
 			ctx.clearRect(0, 0, canvas.width, canvas.height);
-			
+
 			// Sort history by timestamp if available to ensure correct order
 			if (history[0].timestamp) {
 				history.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 			}
-			
+
 			// Process history (simplified from roomData handler)
 			const eraserEvents = [];
-			
+
 			history.forEach((data) => {
 				if (data.tool === "eraser") {
 					eraserEvents.push(data);
 					return;
 				}
-				
+
 				// Apply drawing event
 				ctx.globalCompositeOperation = "source-over";
 				ctx.strokeStyle = data.color || "#000000";
 				ctx.lineWidth = data.width || data.lineWidth || 5;
 				ctx.globalAlpha = data.opacity !== undefined ? data.opacity : 1.0;
-				
+
 				switch (data.tool) {
 					case "brush":
 						ctx.beginPath();
@@ -1698,6 +1708,12 @@ document.addEventListener("DOMContentLoaded", function () {
 						ctx.stroke();
 						break;
 					case "rectangle":
+						ctx.globalCompositeOperation = "source-over";
+						ctx.strokeStyle = data.color || "#000000";
+						ctx.lineWidth = data.lineWidth || data.width || 5;
+						ctx.fillStyle = "rgba(0,0,0,0)"; // Use fully transparent fill
+						ctx.lineJoin = "miter";
+						ctx.lineCap = "butt";
 						ctx.beginPath();
 						ctx.rect(data.startX, data.startY, data.width, data.height);
 						ctx.stroke();
@@ -1714,12 +1730,12 @@ document.addEventListener("DOMContentLoaded", function () {
 						break;
 				}
 			});
-			
+
 			// Apply eraser events after all drawing events
 			if (eraserEvents.length > 0) {
 				eraserEvents.forEach((data) => {
 					ctx.globalCompositeOperation = "destination-out";
-					
+
 					if (data.startX !== undefined && data.endY !== undefined) {
 						ctx.lineWidth = data.width;
 						ctx.beginPath();
@@ -1727,7 +1743,7 @@ document.addEventListener("DOMContentLoaded", function () {
 						ctx.lineTo(data.endX, data.endY);
 						ctx.stroke();
 					}
-					
+
 					ctx.beginPath();
 					const eraserX = data.endX || data.startX;
 					const eraserY = data.endY || data.startY;
@@ -1735,26 +1751,26 @@ document.addEventListener("DOMContentLoaded", function () {
 					ctx.fill();
 				});
 			}
-			
+
 			// Reset context properties and save state
 			ctx.globalCompositeOperation = "source-over";
 			ctx.globalAlpha = 1.0;
 			saveState();
-			
+
 			// showToast("Board synchronized", "info");
 		}
 	});
-	
+
 	// Start sync interval when connected
 	socket.on("connect", () => {
 		setupSyncInterval();
 	});
-	
+
 	// Setup sync interval also after roomData received
 	socket.on("roomData", () => {
 		setupSyncInterval();
 	});
-	
+
 	// Clear interval on disconnect
 	socket.on("disconnect", () => {
 		if (syncInterval) {
@@ -1763,27 +1779,27 @@ document.addEventListener("DOMContentLoaded", function () {
 	});
 
 	// Users panel toggle functionality
-	const usersPanel = document.getElementById('usersPanel');
-	const toggleButton = document.getElementById('toggleUsersPanel');
-	
+	const usersPanel = document.getElementById("usersPanel");
+	const toggleButton = document.getElementById("toggleUsersPanel");
+
 	// Panel should be visible by default, so we'll only check for explicitly collapsed state
-	const isPanelCollapsed = localStorage.getItem('usersPanelCollapsed') === 'true';
+	const isPanelCollapsed = localStorage.getItem("usersPanelCollapsed") === "true";
 	if (isPanelCollapsed) {
-		usersPanel.classList.add('collapsed');
+		usersPanel.classList.add("collapsed");
 	}
 
 	// Toggle on button click
-	toggleButton.addEventListener('click', (e) => {
+	toggleButton.addEventListener("click", (e) => {
 		e.stopPropagation(); // Prevent event from bubbling
-		usersPanel.classList.toggle('collapsed');
-		localStorage.setItem('usersPanelCollapsed', usersPanel.classList.contains('collapsed'));
+		usersPanel.classList.toggle("collapsed");
+		localStorage.setItem("usersPanelCollapsed", usersPanel.classList.contains("collapsed"));
 	});
 
 	// Show panel when clicking anywhere on it while collapsed
-	usersPanel.addEventListener('click', (e) => {
-		if (usersPanel.classList.contains('collapsed')) {
-			usersPanel.classList.remove('collapsed');
-			localStorage.setItem('usersPanelCollapsed', false);
+	usersPanel.addEventListener("click", (e) => {
+		if (usersPanel.classList.contains("collapsed")) {
+			usersPanel.classList.remove("collapsed");
+			localStorage.setItem("usersPanelCollapsed", false);
 		}
 	});
 });
