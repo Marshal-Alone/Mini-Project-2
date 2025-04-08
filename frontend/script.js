@@ -341,7 +341,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				}
 			} catch (error) {
 				console.error("Registration error:", error);
-				errorMessage.textContent = "Unable to connect to the server. Please check your internet connection and try again.";
+				errorMessage.textContent = "#4 Unable to connect to the server. Please check your internet connection and try again.";
 				errorMessage.classList.add('visible');
 			} finally {
 				// Reset button state
