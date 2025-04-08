@@ -1,6 +1,12 @@
 import config from './config.js';
 
 document.addEventListener("DOMContentLoaded", function () {
+	// Hide welcome message by default
+	const welcomeMessage = document.querySelector(".welcome-message");
+	if (welcomeMessage) {
+		welcomeMessage.style.display = "none";
+	}
+
 	// Check if user is logged in
 	const checkAuth = async () => {
 		try {
@@ -28,7 +34,6 @@ document.addEventListener("DOMContentLoaded", function () {
 	const updateAuthUI = (user) => {
 		const authLinks = document.querySelector(".nav-links");
 		const userNameDisplay = document.getElementById("userNameDisplay");
-		const welcomeMessage = document.querySelector(".welcome-message");
 
 		if (welcomeMessage) {
 			welcomeMessage.style.display = user ? "block" : "none";
@@ -55,9 +60,28 @@ document.addEventListener("DOMContentLoaded", function () {
 				// Add logout handler
 				document.getElementById("logoutBtn").addEventListener("click", async () => {
 					try {
-						await fetch("/api/logout", { method: "POST" });
+						// Clear UI immediately
+						authLinks.innerHTML = `
+                            <a href="#features">Features</a>
+                            <a href="#pricing">Pricing</a>
+                            <a href="#about">About</a>
+                            <a href="auth.html?tab=login" class="btn btn-outline">Log in</a>
+                            <a href="auth.html?tab=register" class="btn btn-primary">Sign up</a>
+                        `;
+						
+						// Then make the API call
+						await fetch(`${config.API_URL}/api/logout`, { 
+							method: "POST",
+							headers: {
+								Authorization: `Bearer ${localStorage.getItem("token")}`
+							}
+						});
+						
+						// Clear local storage
 						localStorage.removeItem("token");
 						localStorage.removeItem("user");
+						
+						// Redirect to home page
 						window.location.href = "/";
 					} catch (error) {
 						console.error("Logout error:", error);
