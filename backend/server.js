@@ -32,14 +32,19 @@ mongoose
 
 const app = express();
 const server = http.createServer(app);
+
+// CORS configuration
+const corsOptions = {
+	origin: process.env.NODE_ENV === 'production' 
+		? ['https://collaborative-whiteboard-z8ai.onrender.com']
+		: ['http://localhost:3000'],
+	methods: ['GET', 'POST', 'OPTIONS'],
+	allowedHeaders: ['Content-Type', 'Authorization'],
+	credentials: true
+};
+
 const io = new Server(server, {
-	cors: {
-		origin: process.env.NODE_ENV === 'production' 
-			? [process.env.FRONTEND_URL,'https://collaborative-whiteboard-z8ai.onrender.com']
-			: '*',
-		methods: ["GET", "POST"],
-		credentials: true
-	},
+	cors: corsOptions
 });
 
 // Middleware
@@ -49,17 +54,19 @@ app.use(cookieParser());
 
 // CORS middleware
 app.use((req, res, next) => {
-	const allowedOrigins = process.env.NODE_ENV === 'production'
-		? ['https://collaborative-whiteboard-z8ai.onrender.com']
-		: ['http://localhost:3000'];
-	
 	const origin = req.headers.origin;
-	if (allowedOrigins.includes(origin)) {
+	if (corsOptions.origin.includes(origin)) {
 		res.setHeader('Access-Control-Allow-Origin', origin);
 	}
-	res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-	res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+	res.setHeader('Access-Control-Allow-Methods', corsOptions.methods.join(','));
+	res.setHeader('Access-Control-Allow-Headers', corsOptions.allowedHeaders.join(','));
 	res.setHeader('Access-Control-Allow-Credentials', 'true');
+	
+	// Handle preflight requests
+	if (req.method === 'OPTIONS') {
+		return res.status(200).end();
+	}
+	
 	next();
 });
 
