@@ -664,17 +664,41 @@
                         localStorage.setItem('user', JSON.stringify(data.user));
                         window.location.href = '/';
                     } else {
-                        // Check for specific error types
-                        if (response.status === 409) {
-                            // Handle duplicate email error
-                            showError('register', data.error || 'Email is already registered');
+                        // Handle specific error types
+                        if (data.code === 'EMAIL_EXISTS') {
+                            // Switch to login tab
+                            document.querySelectorAll('.tab-trigger').forEach(t => t.classList.remove('active'));
+                            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                            
+                            const loginTrigger = document.querySelector('[data-tab="login"]');
+                            const loginContent = document.getElementById('login');
+                            
+                            if (loginTrigger && loginContent) {
+                                loginTrigger.classList.add('active');
+                                loginContent.classList.add('active');
+                                
+                                // Focus the email field and copy the email value
+                                const registerEmail = document.getElementById('register-email').value;
+                                const loginEmail = document.getElementById('login-email');
+                                if (loginEmail && registerEmail) {
+                                    loginEmail.value = registerEmail;
+                                    loginEmail.focus();
+                                }
+                                
+                                // Show message in login form
+                                const loginError = document.getElementById('loginError');
+                                if (loginError) {
+                                    loginError.textContent = "This email is already registered. Please log in.";
+                                    loginError.style.display = 'block';
+                                    loginError.classList.add('visible');
+                                }
+                            }
                         } else {
                             showError('register', data.error || 'Registration failed. Please try again.');
                         }
                     }
                 } catch (error) {
-                    // showError('register', '#1 Registration failed. Please check your connection and try again.');
-                    console.log('register', '#1 Registration failed. Please check your connection and try again.'); 
+                    showError('register', 'Registration failed. Please check your connection and try again.');
                 } finally {
                     submitBtn.disabled = false;
                     submitBtn.textContent = 'Create Account';

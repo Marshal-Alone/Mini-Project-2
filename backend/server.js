@@ -129,17 +129,16 @@ app.post("/api/register", async (req, res) => {
 			return res.status(400).json({ error: "Password must be at least 8 characters long" });
 		}
 
-		// Check if user already exists using findOne (more reliable than try-catch for duplicates)
+		// Check if user already exists
 		const existingUser = await User.findOne({ email });
 		if (existingUser) {
-			console.log(`Registration attempt with existing email: ${email}`);
-			return res
-				.status(409)
-				.json({ error: "This email is already registered. Please try logging in instead." });
+			return res.status(409).json({ 
+				error: "This email is already registered. Please try logging in instead.",
+				code: "EMAIL_EXISTS"
+			});
 		}
 
-		// Create new user with plain password
-		// (it will be hashed by the User model's pre-save middleware)
+		// Create new user
 		const user = new User({
 			fullName,
 			email,
@@ -155,11 +154,8 @@ app.post("/api/register", async (req, res) => {
 			{ expiresIn: "24h" }
 		);
 
-		// Log new registration
-		console.log(`New user registered: ${email}`);
-
-		// Return user details and token
-		res.status(201).json({
+		// Return success response
+		return res.status(201).json({
 			token,
 			user: {
 				id: user._id,
@@ -169,15 +165,20 @@ app.post("/api/register", async (req, res) => {
 		});
 	} catch (error) {
 		console.error("Registration error:", error);
-
-		// Check specifically for MongoDB duplicate key error
+		
+		// Handle duplicate email error
 		if (error.code === 11000 && error.keyPattern && error.keyPattern.email) {
-			return res
-				.status(409)
-				.json({ error: "This email is already registered. Please try logging in instead." });
+			return res.status(409).json({ 
+				error: "This email is already registered. Please try logging in instead.",
+				code: "EMAIL_EXISTS"
+			});
 		}
-
-		res.status(500).json({ error: "Registration failed. Please try again later." });
+		
+		// Handle other errors
+		return res.status(500).json({ 
+			error: "Registration failed. Please try again later.",
+			code: "SERVER_ERROR"
+		});
 	}
 });
 
