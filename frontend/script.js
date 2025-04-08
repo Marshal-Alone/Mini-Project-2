@@ -276,34 +276,32 @@ document.addEventListener("DOMContentLoaded", function () {
 	if (registerForm) {
 		registerForm.addEventListener("submit", async (e) => {
 			e.preventDefault();
-			const fullName = document.getElementById("fullName")?.value;
-			const email = document.getElementById("register-email")?.value;
-			const password = document.getElementById("password")?.value;
+			const fullName = document.getElementById("fullName").value;
+			const email = document.getElementById("register-email").value;
+			const password = document.getElementById("password").value;
+			const errorMessage = document.getElementById("registerError");
+			const submitButton = registerForm.querySelector('button[type="submit"]');
+			const originalButtonText = submitButton.textContent;
 
-			// Get error message element
-			const errorMessage = document.querySelector('.error-message');
-			
-			// Simple validation with modern error display
-			if (!fullName || !email || !password) {
-				errorMessage.textContent = "Please fill out all fields";
-				errorMessage.classList.add('visible');
-				return;
-			}
+			// Reset previous error states
+			errorMessage.classList.remove('visible');
+			document.getElementById('register-email').classList.remove('error-field');
+			document.getElementById('password').classList.remove('error-field');
 
+			// Validate password length
 			if (password.length < 8) {
-				errorMessage.textContent = "Password must be at least 8 characters long!";
+				errorMessage.textContent = "Password must be at least 8 characters long";
 				errorMessage.classList.add('visible');
-				
-				// Highlight the password field as an error
-				const passwordField = document.getElementById('password');
-				passwordField.classList.add('error-field');
-				
-				// Focus on the password field
-				passwordField.focus();
+				document.getElementById('password').classList.add('error-field');
+				document.getElementById('password').focus();
 				return;
 			}
 
 			try {
+				// Show loading state
+				submitButton.disabled = true;
+				submitButton.textContent = "Creating account...";
+
 				const response = await fetch(`${config.API_URL}/api/register`, {
 					method: "POST",
 					headers: {
@@ -314,25 +312,41 @@ document.addEventListener("DOMContentLoaded", function () {
 
 				const data = await response.json();
 
-				if (response.ok) {
+				if (response.status === 201 || response.ok) {
+					// Registration successful - don't show any error
 					localStorage.setItem("token", data.token);
 					localStorage.setItem("user", JSON.stringify(data.user));
 					window.location.href = "/";
-				} else {
-					errorMessage.textContent = data.error || "This email is already registered. Please use a different email or login instead.";
+					return; // Exit early on success
+				}
+
+				// Only handle errors if we reach this point
+				if (response.status === 409) {
+					errorMessage.textContent = "This email is already registered. Would you like to login instead?";
 					errorMessage.classList.add('visible');
 					
-					// Highlight the email field as an error
+					// Add login link to error message
+					errorMessage.innerHTML += '<br><a href="auth.html?tab=login" class="error-link">Click here to login</a>';
+					
+					// Highlight the email field
 					const emailField = document.getElementById('register-email');
 					emailField.classList.add('error-field');
-					
-					// Focus on the email field for better UX
 					emailField.focus();
+				} else if (response.status === 400) {
+					errorMessage.textContent = data.error || "Please check your input and try again";
+					errorMessage.classList.add('visible');
+				} else {
+					errorMessage.textContent = data.error || "Registration failed. Please try again";
+					errorMessage.classList.add('visible');
 				}
 			} catch (error) {
 				console.error("Registration error:", error);
-				errorMessage.textContent = "Registration failed. Please try again.";
+				errorMessage.textContent = "Unable to connect to the server. Please check your internet connection and try again.";
 				errorMessage.classList.add('visible');
+			} finally {
+				// Reset button state
+				submitButton.disabled = false;
+				submitButton.textContent = originalButtonText;
 			}
 		});
 	}

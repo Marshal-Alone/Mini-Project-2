@@ -233,34 +233,45 @@
         }
 
         .error-message {
-            color: var(--error-color);
-            background-color: rgba(239, 68, 68, 0.1);
-            padding: 0.75rem;
-            border-radius: var(--radius);
-            margin-bottom: 0.75rem;
-            font-size: 0.875rem;
             display: none;
+            color: #dc3545;
+            background-color: #fdf1f2;
+            border: 1px solid #fad7dc;
+            border-radius: 4px;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+            text-align: center;
         }
 
         .error-message.visible {
             display: block;
-            animation: shake 0.5s ease-in-out;
+            animation: fadeIn 0.3s ease-in-out;
         }
 
-        @keyframes shake {
+        .error-field {
+            border-color: #dc3545 !important;
+            background-color: #fff8f8;
+        }
 
-            0%,
-            100% {
-                transform: translateX(0);
-            }
+        .error-field:focus {
+            box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+        }
 
-            25% {
-                transform: translateX(-5px);
-            }
+        .error-link {
+            color: #0056b3;
+            text-decoration: underline;
+            margin-left: 5px;
+        }
 
-            75% {
-                transform: translateX(5px);
-            }
+        .error-link:hover {
+            color: #003d82;
+            text-decoration: none;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .btn:disabled {
