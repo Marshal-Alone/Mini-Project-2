@@ -12,7 +12,27 @@ document.addEventListener("DOMContentLoaded", function () {
 	}
 
 	// Socket.io setup
-	const socket = io();
+	const socket = io('https://collaboard-backend-cdr6.onrender.com', {
+		transports: ['websocket'],
+		withCredentials: true
+	});
+
+	// Connection status handling
+	socket.on('connect', () => {
+		console.log('Connected to server');
+		connectionStatus.innerHTML = '<i class="fas fa-circle" style="color: #4CAF50;"></i> Connected';
+	});
+
+	socket.on('disconnect', () => {
+		console.log('Disconnected from server');
+		connectionStatus.innerHTML = '<i class="fas fa-circle" style="color: #f44336;"></i> Disconnected';
+	});
+
+	socket.on('connect_error', (error) => {
+		console.error('Connection error:', error);
+		connectionStatus.innerHTML = '<i class="fas fa-circle" style="color: #f44336;"></i> Connection Error';
+	});
+
 	let currentUserId = null;
 
 	// Get URL parameters
