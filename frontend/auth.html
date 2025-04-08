@@ -653,6 +653,11 @@
                     const data = await response.json();
 
                     if (response.ok) {
+                        // Clear any error messages on success
+                        const errorDiv = document.getElementById('registerError');
+                        errorDiv.classList.remove('visible');
+                        errorDiv.textContent = '';
+
                         localStorage.setItem('token', data.token);
                         localStorage.setItem('user', JSON.stringify(data.user));
                         window.location.href = '/';
@@ -666,7 +671,7 @@
                         }
                     }
                 } catch (error) {
-                    showError('register', '#1 Registration failed. Please check your connection and try again. HAHA');
+                    showError('register', '#1 Registration failed. Please check your connection and try again.');
                 } finally {
                     submitBtn.disabled = false;
                     submitBtn.textContent = 'Create Account';

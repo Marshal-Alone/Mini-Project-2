@@ -313,7 +313,9 @@ document.addEventListener("DOMContentLoaded", function () {
 				const data = await response.json();
 
 				if (response.status === 201 || response.ok) {
-					// Registration successful - don't show any error
+					// Registration successful - clear any error messages
+					errorMessage.classList.remove('visible');
+					errorMessage.textContent = "";
 					localStorage.setItem("token", data.token);
 					localStorage.setItem("user", JSON.stringify(data.user));
 					window.location.href = "/";
@@ -341,7 +343,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				}
 			} catch (error) {
 				console.error("Registration error:", error);
-				errorMessage.textContent = "#4 Unable to connect to the server. Please check your internet connection and try again.";
+				errorMessage.textContent = `#4 Unable to connect to the server. Please check your internet connection and try again. Error: ${error.message}`;
 				errorMessage.classList.add('visible');
 			} finally {
 				// Reset button state
