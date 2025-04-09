@@ -34,7 +34,9 @@ document.addEventListener("DOMContentLoaded", function () {
 	const updateAuthUI = (user) => {
 		const authLinks = document.querySelector(".nav-links");
 		const userNameDisplay = document.getElementById("userNameDisplay");
+		const welcomeMessage = document.querySelector(".welcome-message");
 
+		// Ensure welcome message is only shown to authenticated users
 		if (welcomeMessage) {
 			welcomeMessage.style.display = user ? "block" : "none";
 		}
