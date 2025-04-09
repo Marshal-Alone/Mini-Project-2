@@ -37,15 +37,17 @@
     </div>
 </div>
 
-<script>
+<script type="module">
+    import config from './config.js';
+    
     document.addEventListener('DOMContentLoaded', function() {
         // Show error message function
-        const showError = (message) => {
+        const showError = (message, code) => {
             const errorDiv = document.getElementById('registerError');
             if (!errorDiv) return;
             
             // Special handling for duplicate email errors
-            if (message.includes("already registered")) {
+            if (code === 'EMAIL_EXISTS' || message.includes("already registered")) {
                 // Show login link with the error message
                 errorDiv.innerHTML = `${message} <a href="login.html" class="error-action-link">Log in now</a>`;
             } else {
@@ -62,7 +64,7 @@
             }, 10);
             
             // For duplicate email errors, keep the message visible longer
-            const hideDelay = message.includes("already registered") ? 10000 : 5000;
+            const hideDelay = (code === 'EMAIL_EXISTS' || message.includes("already registered")) ? 10000 : 5000;
             
             // Hide after delay
             setTimeout(() => {
@@ -125,7 +127,7 @@
                 
                 // Basic validation
                 if (password.length < 8) {
-                    showError('Password must be at least 8 characters long!');
+                    showError('Password must be at least 8 characters long!', 'INVALID_PASSWORD');
                     return;
                 }
                 
@@ -136,7 +138,7 @@
                 
                 try {
                     // Send registration request
-                    const response = await fetch('/api/register', {
+                    const response = await fetch(`${config.API_URL}/api/register`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -153,8 +155,21 @@
                         window.location.href = '/';
                     } else {
                         // Check for specific error types
-                        if (response.status === 409) {
-                            // Focus the email field for duplicate email errors
+                        if (data.code === 'EMAIL_EXISTS') {
+                            const emailField = document.getElementById('register-email');
+                            if (emailField) {
+                                emailField.focus();
+                                emailField.classList.add('error-field');
+                                setTimeout(() => emailField.classList.remove('error-field'), 3000);
+                            }
+                        } else if (data.code === 'INVALID_PASSWORD') {
+                            const passwordField = document.getElementById('password');
+                            if (passwordField) {
+                                passwordField.focus();
+                                passwordField.classList.add('error-field');
+                                setTimeout(() => passwordField.classList.remove('error-field'), 3000);
+                            }
+                        } else if (data.code === 'INVALID_EMAIL') {
                             const emailField = document.getElementById('register-email');
                             if (emailField) {
                                 emailField.focus();
@@ -163,11 +178,11 @@
                             }
                         }
                         // Show error message from server
-                        showError(data.error || 'Registration failed. Please try again.');
+                        showError(data.error || 'Registration failed. Please try again.', data.code);
                     }
                 } catch (error) {
                     // Show network error
-                    showError('#3 Registration failed. Please check your connection and try again. hehe');
+                    showError('Registration failed. Please check your connection and try again.', 'CONNECTION_ERROR');
                 } finally {
                     // Reset button state
                     registerButton.disabled = false;

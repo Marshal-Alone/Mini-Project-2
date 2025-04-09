@@ -522,12 +522,12 @@
         setInitialTab();
 
         // Error message display helper
-        const showError = (formType, message) => {
+        const showError = (formType, message, code = null) => {
             const errorDiv = document.getElementById(`${formType}Error`);
             if (!errorDiv) return;
             
             // Special handling for duplicate email errors
-            if (message.includes("already registered")) {
+            if (code === 'EMAIL_EXISTS') {
                 // Switch to login tab
                 document.querySelectorAll('.tab-trigger').forEach(t => t.classList.remove('active'));
                 document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -561,7 +561,6 @@
                             }, 300);
                         }, 5000);
                     }
-                    
                     return;
                 }
             }
@@ -584,45 +583,6 @@
             }, 5000);
         };
 
-        // Login form submission
-        const loginForm = document.getElementById('loginForm');
-        if (loginForm) {
-            loginForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const submitBtn = loginForm.querySelector('button[type="submit"]');
-                submitBtn.disabled = true;
-                submitBtn.textContent = 'Signing in...';
-
-                try {
-                    const email = document.getElementById('login-email').value;
-                    const password = document.getElementById('l-password').value;
-
-                    const response = await fetch('/api/login', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ email, password }),
-                    });
-
-                    const data = await response.json();
-
-                    if (response.ok) {
-                        localStorage.setItem('token', data.token);
-                        localStorage.setItem('user', JSON.stringify(data.user));
-                        window.location.href = '/';
-                    } else {
-                        showError('login', data.error || 'Invalid email or password');
-                    }
-                } catch (error) {
-                    showError('login', 'Login failed. Please check your connection and try again.');
-                } finally {
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Sign In';
-                }
-            });
-        }
-
         // Registration form submission
         const registerForm = document.getElementById('registerForm');
         if (registerForm) {
@@ -638,7 +598,10 @@
                     const password = document.getElementById('password').value;
 
                     if (password.length < 8) {
-                        showError('register', 'Password must be at least 8 characters long!');
+                        showError('register', 'Password must be at least 8 characters long', 'INVALID_PASSWORD');
+                        document.getElementById('password').focus();
+                        document.getElementById('password').classList.add('error-field');
+                        setTimeout(() => document.getElementById('password').classList.remove('error-field'), 3000);
                         submitBtn.disabled = false;
                         submitBtn.textContent = 'Create Account';
                         return;
@@ -664,44 +627,86 @@
                         localStorage.setItem('user', JSON.stringify(data.user));
                         window.location.href = '/';
                     } else {
-                        // Handle specific error types
-                        if (data.code === 'EMAIL_EXISTS') {
-                            // Switch to login tab
-                            document.querySelectorAll('.tab-trigger').forEach(t => t.classList.remove('active'));
-                            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                            
-                            const loginTrigger = document.querySelector('[data-tab="login"]');
-                            const loginContent = document.getElementById('login');
-                            
-                            if (loginTrigger && loginContent) {
-                                loginTrigger.classList.add('active');
-                                loginContent.classList.add('active');
-                                
-                                // Focus the email field and copy the email value
-                                const registerEmail = document.getElementById('register-email').value;
-                                const loginEmail = document.getElementById('login-email');
-                                if (loginEmail && registerEmail) {
-                                    loginEmail.value = registerEmail;
-                                    loginEmail.focus();
-                                }
-                                
-                                // Show message in login form
-                                const loginError = document.getElementById('loginError');
-                                if (loginError) {
-                                    loginError.textContent = "This email is already registered. Please log in.";
-                                    loginError.style.display = 'block';
-                                    loginError.classList.add('visible');
-                                }
-                            }
-                        } else {
-                            showError('register', data.error || 'Registration failed. Please try again.');
+                        // Handle specific error types based on code
+                        showError('register', data.error, data.code);
+                        
+                        // Focus appropriate field based on error
+                        if (data.code === 'INVALID_EMAIL') {
+                            const field = document.getElementById('register-email');
+                            field.focus();
+                            field.classList.add('error-field');
+                            setTimeout(() => field.classList.remove('error-field'), 3000);
+                        } else if (data.code === 'INVALID_PASSWORD') {
+                            const field = document.getElementById('password');
+                            field.focus();
+                            field.classList.add('error-field');
+                            setTimeout(() => field.classList.remove('error-field'), 3000);
                         }
                     }
                 } catch (error) {
-                    showError('register', 'Registration failed. Please check your connection and try again.');
+                    showError('register', 'Registration failed. Please check your connection and try again.', 'CONNECTION_ERROR');
                 } finally {
                     submitBtn.disabled = false;
                     submitBtn.textContent = 'Create Account';
+                }
+            });
+        }
+
+        // Login form submission
+        const loginForm = document.getElementById('loginForm');
+        if (loginForm) {
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const submitBtn = loginForm.querySelector('button[type="submit"]');
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Signing in...';
+
+                try {
+                    const email = document.getElementById('login-email').value;
+                    const password = document.getElementById('l-password').value;
+
+                    const response = await fetch(`${config.API_URL}/api/login`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ email, password }),
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        localStorage.setItem('token', data.token);
+                        localStorage.setItem('user', JSON.stringify(data.user));
+                        window.location.href = '/';
+                    } else {
+                        // Highlight fields for login error
+                        if (response.status === 401) {
+                            const emailField = document.getElementById('login-email');
+                            const passwordField = document.getElementById('l-password');
+                            
+                            if (emailField && passwordField) {
+                                emailField.classList.add('error-field');
+                                passwordField.classList.add('error-field');
+                                
+                                setTimeout(() => {
+                                    emailField.classList.remove('error-field');
+                                    passwordField.classList.remove('error-field');
+                                }, 3000);
+                                
+                                // Focus password field for easier retry
+                                passwordField.focus();
+                                passwordField.select();
+                            }
+                        }
+                        
+                        showError('login', data.error || 'Invalid email or password');
+                    }
+                } catch (error) {
+                    showError('login', 'Login failed. Please check your connection and try again.');
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Sign In';
                 }
             });
         }
@@ -716,6 +721,10 @@
                 // Add active class to clicked trigger and corresponding content
                 trigger.classList.add('active');
                 document.getElementById(trigger.dataset.tab).classList.add('active');
+                
+                // Clear error messages when switching tabs
+                document.getElementById('loginError').style.display = 'none';
+                document.getElementById('registerError').style.display = 'none';
             });
         });
     </script>

@@ -115,18 +115,27 @@ app.post("/api/register", async (req, res) => {
 
 		// Validate input
 		if (!fullName || !email || !password) {
-			return res.status(400).json({ error: "All fields are required" });
+			return res.status(400).json({ 
+				error: "All fields are required",
+				code: "MISSING_FIELDS"
+			});
 		}
 
 		// Validate email format
 		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 		if (!emailRegex.test(email)) {
-			return res.status(400).json({ error: "Please enter a valid email address" });
+			return res.status(400).json({ 
+				error: "Please enter a valid email address",
+				code: "INVALID_EMAIL"
+			});
 		}
 
 		// Validate password length
 		if (password.length < 8) {
-			return res.status(400).json({ error: "Password must be at least 8 characters long" });
+			return res.status(400).json({ 
+				error: "Password must be at least 8 characters long",
+				code: "INVALID_PASSWORD"
+			});
 		}
 
 		// Check if user already exists
@@ -166,7 +175,7 @@ app.post("/api/register", async (req, res) => {
 	} catch (error) {
 		console.error("Registration error:", error);
 		
-		// Handle duplicate email error
+		// Handle duplicate email error from MongoDB
 		if (error.code === 11000 && error.keyPattern && error.keyPattern.email) {
 			return res.status(409).json({ 
 				error: "This email is already registered. Please try logging in instead.",
@@ -188,7 +197,10 @@ app.post("/api/login", async (req, res) => {
 
 		// Validate input
 		if (!email || !password) {
-			return res.status(400).json({ error: "Email and password are required" });
+			return res.status(400).json({ 
+				error: "Email and password are required",
+				code: "MISSING_FIELDS"
+			});
 		}
 
 		// Find user by email
@@ -196,7 +208,10 @@ app.post("/api/login", async (req, res) => {
 
 		// Check if user exists
 		if (!user) {
-			return res.status(401).json({ error: "Invalid email or password" });
+			return res.status(401).json({ 
+				error: "Invalid email or password",
+				code: "ACCOUNT_NOT_FOUND"
+			});
 		}
 
 		// Compare passwords
@@ -205,7 +220,10 @@ app.post("/api/login", async (req, res) => {
 		if (!isPasswordValid) {
 			// Log failed login attempt
 			console.log(`Failed login attempt for email: ${email}`);
-			return res.status(401).json({ error: "Invalid email or password" });
+			return res.status(401).json({ 
+				error: "Invalid email or password",
+				code: "INVALID_CREDENTIALS"
+			});
 		}
 
 		// Create JWT token
@@ -219,7 +237,7 @@ app.post("/api/login", async (req, res) => {
 		console.log(`User logged in: ${email}`);
 
 		// Return user details and token
-		res.status(200).json({
+		return res.status(200).json({
 			token,
 			user: {
 				id: user._id,
@@ -229,7 +247,10 @@ app.post("/api/login", async (req, res) => {
 		});
 	} catch (error) {
 		console.error("Login error:", error);
-		res.status(500).json({ error: "Login failed. Please try again later." });
+		return res.status(500).json({ 
+			error: "Login failed. Please try again later.",
+			code: "SERVER_ERROR"
+		});
 	}
 });
 

@@ -35,14 +35,25 @@
     </div>
 </div>
 
-<script>
+<script type="module">
+    import config from './config.js';
+    
     document.addEventListener('DOMContentLoaded', function() {
         // Show error message function
-        const showError = (message) => {
+        const showError = (message, code) => {
             const errorDiv = document.getElementById('loginError');
             if (!errorDiv) return;
             
-            errorDiv.textContent = message;
+            // Special handling for authentication errors
+            if (code === 'INVALID_CREDENTIALS') {
+                errorDiv.textContent = message;
+            } else if (code === 'ACCOUNT_NOT_FOUND') {
+                // Show register link with the error message
+                errorDiv.innerHTML = `${message} <a href="register.html" class="error-action-link">Create an account</a>`;
+            } else {
+                errorDiv.textContent = message;
+            }
+            
             errorDiv.style.display = 'block';
             errorDiv.classList.add('visible');
             
@@ -78,7 +89,7 @@
                 
                 try {
                     // Send login request
-                    const response = await fetch('/api/login', {
+                    const response = await fetch(`${config.API_URL}/api/login`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -94,12 +105,33 @@
                         localStorage.setItem('user', JSON.stringify(data.user));
                         window.location.href = '/';
                     } else {
-                        // Show specific error message from server
-                        showError(data.error || 'Invalid email or password');
+                        // Handle specific error types
+                        if (response.status === 401) {
+                            const emailField = document.getElementById('login-email');
+                            const passwordField = document.getElementById('login-password');
+                            
+                            // Highlight both fields for login error
+                            if (emailField && passwordField) {
+                                emailField.classList.add('error-field');
+                                passwordField.classList.add('error-field');
+                                
+                                setTimeout(() => {
+                                    emailField.classList.remove('error-field');
+                                    passwordField.classList.remove('error-field');
+                                }, 3000);
+                                
+                                // Focus password field for easier retry
+                                passwordField.focus();
+                            }
+                            
+                            showError(data.error || 'Invalid email or password', 'INVALID_CREDENTIALS');
+                        } else {
+                            showError(data.error || 'Login failed', data.code);
+                        }
                     }
                 } catch (error) {
                     // Show network error
-                    showError('#2 Login failed. Please check your connection and try again.');
+                    showError('Login failed. Please check your connection and try again.', 'CONNECTION_ERROR');
                 } finally {
                     // Reset button state
                     loginButton.disabled = false;
