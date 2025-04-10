@@ -12,7 +12,14 @@ document.addEventListener("DOMContentLoaded", function () {
 	}
 
 	// Socket.io setup
-	const socket = io();
+	const socket = io("https://online-whiteboard-mini-project.netlify.app", {
+		transports: ["websocket"],
+		forceNew: true,
+		reconnection: true,
+		reconnectionAttempts: 5,
+		reconnectionDelay: 1000,
+		timeout: 20000
+	});
 	let currentUserId = null;
 
 	// Get URL parameters
