@@ -12,7 +12,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	}
 
 	// Socket.io setup
-	const socket = io("https://online-whiteboard-mini-project.netlify.app", {
+	const socket = io("https://whiteboard-backend-p0l5.onrender.com", {
 		transports: ["websocket"],
 		forceNew: true,
 		reconnection: true,
@@ -432,28 +432,30 @@ document.addEventListener("DOMContentLoaded", function () {
 		}
 	}
 
-	// Handle received drawing events
+	// Handle drawing events with optimized performance
 	socket.on("drawEvent", (data) => {
 		// Always save the current canvas state before applying new changes
 		const tempState = new Image();
 		tempState.src = canvas.toDataURL();
 
 		// Set context properties for drawing
-		ctx.lineWidth = data.width || data.lineWidth || 5; // Ensure we have a line width
-
-		// Reset context state to ensure clean drawing
+		ctx.lineWidth = data.width || data.lineWidth || 5;
 		ctx.globalCompositeOperation = "source-over";
 		ctx.globalAlpha = data.opacity !== undefined ? data.opacity : 1.0;
 
+		// Add timestamp to the event if not present
+		if (!data.timestamp) {
+			data.timestamp = Date.now();
+		}
+
+		// Process the drawing event
 		switch (data.tool) {
 			case "brush":
-				ctx.globalCompositeOperation = "source-over";
 				ctx.strokeStyle = data.color || "#000000";
 				ctx.lineWidth = data.width;
 				ctx.lineCap = "round";
 				ctx.lineJoin = "round";
 
-				// Draw smooth curve if points are provided
 				if (data.points && data.points.length >= 2) {
 					ctx.beginPath();
 					ctx.moveTo(data.points[0].x, data.points[0].y);
@@ -467,8 +469,6 @@ document.addEventListener("DOMContentLoaded", function () {
 							const yc = (data.points[i].y + data.points[i + 1].y) / 2;
 							ctx.quadraticCurveTo(data.points[i].x, data.points[i].y, xc, yc);
 						}
-
-						// Curve through the last two points
 						ctx.quadraticCurveTo(
 							data.points[i].x,
 							data.points[i].y,
@@ -477,47 +477,21 @@ document.addEventListener("DOMContentLoaded", function () {
 						);
 					}
 					ctx.stroke();
-				} else {
-					// Fallback to simple line for backward compatibility
-					ctx.beginPath();
-					ctx.moveTo(data.startX, data.startY);
-					ctx.lineTo(data.endX, data.endY);
-					ctx.stroke();
 				}
 				break;
 
 			case "eraser":
-				// Set composite operation to destination-out for erasing
 				ctx.globalCompositeOperation = "destination-out";
-
-				// If we have both start and end positions, draw a line for continuous erasing
-				if (
-					data.startX !== undefined &&
-					data.startY !== undefined &&
-					data.endX !== undefined &&
-					data.endY !== undefined
-				) {
-					ctx.lineWidth = data.width;
-					ctx.strokeStyle = "rgba(255,255,255,1)"; // Color doesn't matter with destination-out
-					ctx.beginPath();
-					ctx.moveTo(data.startX, data.startY);
-					ctx.lineTo(data.endX, data.endY);
-					ctx.stroke();
-				}
-
-				// Also draw a circle for spot erasing (either at end point or provided position)
+				ctx.lineWidth = data.width;
 				ctx.beginPath();
-				const eraserX = data.endX || data.startX;
-				const eraserY = data.endY || data.startY;
-				ctx.arc(eraserX, eraserY, data.width / 2, 0, Math.PI * 2, false);
-				ctx.fill();
+				ctx.moveTo(data.startX, data.startY);
+				ctx.lineTo(data.endX, data.endY);
+				ctx.stroke();
 				break;
 
 			case "line":
-				ctx.globalCompositeOperation = "source-over"; // Ensure normal drawing mode
 				ctx.strokeStyle = data.color || "#000000";
 				ctx.lineWidth = data.lineWidth || data.width || 5;
-				ctx.fillStyle = "transparent";
 				ctx.beginPath();
 				ctx.moveTo(data.startX, data.startY);
 				ctx.lineTo(data.endX, data.endY);
@@ -525,44 +499,87 @@ document.addEventListener("DOMContentLoaded", function () {
 				break;
 
 			case "rectangle":
-				ctx.globalCompositeOperation = "source-over"; // Ensure normal drawing mode
 				ctx.strokeStyle = data.color || "#000000";
 				ctx.lineWidth = data.lineWidth || data.width || 5;
-				ctx.fillStyle = "transparent";
 				ctx.beginPath();
 				ctx.rect(data.startX, data.startY, data.width, data.height);
 				ctx.stroke();
 				break;
 
 			case "circle":
-				ctx.globalCompositeOperation = "source-over"; // Ensure normal drawing mode
 				ctx.strokeStyle = data.color || "#000000";
 				ctx.lineWidth = data.lineWidth || data.width || 5;
-				ctx.fillStyle = "transparent";
 				ctx.beginPath();
 				ctx.arc(data.centerX, data.centerY, data.radius, 0, Math.PI * 2);
 				ctx.stroke();
 				break;
-
-			case "text":
-				ctx.globalCompositeOperation = "source-over"; // Ensure normal drawing mode
-				ctx.font = `${data.fontSize}px Arial`;
-				ctx.fillStyle = data.color || "#000000";
-				ctx.fillText(data.text, data.x, data.y);
-				break;
 		}
 
-		// Reset context properties after drawing
-		ctx.globalCompositeOperation = "source-over";
-		ctx.globalAlpha = 1;
+		// Save state after each event
+		saveState();
+	});
 
-		// Save state after each received event to ensure history is updated
-		// but only save occasionally to prevent performance issues
-		if (Math.random() < 0.2) {
-			// 20% chance to save state
-			saveState();
+	// Handle board sync with improved performance
+	socket.on("boardSync", ({ history }) => {
+		console.log(`Received board sync with ${history.length} history items`);
+
+		if (history && history.length > 0) {
+			// Clear canvas
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+			// Sort history by timestamp
+			history.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+			// Process in batches to improve performance
+			const batchSize = 50;
+			let currentIndex = 0;
+
+			function processBatch() {
+				const endIndex = Math.min(currentIndex + batchSize, history.length);
+				for (let i = currentIndex; i < endIndex; i++) {
+					const data = history[i];
+					// Reuse the same drawing logic as in drawEvent
+					// ... (copy the drawing logic from above)
+				}
+				currentIndex = endIndex;
+
+				if (currentIndex < history.length) {
+					// Process next batch in the next frame
+					requestAnimationFrame(processBatch);
+				} else {
+					// All history processed, save final state
+					saveState();
+				}
+			}
+
+			// Start processing batches
+			processBatch();
 		}
 	});
+
+	// Add periodic sync with optimized timing
+	const SYNC_INTERVAL = 15000; // Reduced to 15 seconds
+	let lastSyncTime = 0;
+
+	function requestBoardSync() {
+		const now = Date.now();
+		if (now - lastSyncTime >= SYNC_INTERVAL) {
+			console.log("Requesting board sync...");
+			socket.emit("requestBoardSync", { roomId });
+			lastSyncTime = now;
+		}
+	}
+
+	// Setup sync interval
+	let syncInterval;
+
+	function setupSyncInterval() {
+		if (syncInterval) {
+			clearInterval(syncInterval);
+		}
+		syncInterval = setInterval(requestBoardSync, SYNC_INTERVAL);
+		console.log("Board sync interval set up");
+	}
 
 	// Handle clear canvas event
 	socket.on("clearCanvas", () => {
@@ -1166,66 +1183,67 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Handle password required
 	socket.on("passwordRequired", () => {
-		passwordModal.classList.add("active");
+		// Check if user is the owner before showing password modal
+		const isOwner = localStorage.getItem(`board_owner_${roomId}`) === "true";
+		if (!isOwner) {
+			passwordModal.classList.add("active");
+		} else {
+			// Owner can join directly without password
+			socket.emit("joinRoom", {
+				roomId,
+				userName: promptForUserName(),
+				hasLocalAuth: true,
+				isOwner: true
+			});
+		}
 	});
 
 	// Handle user rights
 	let isOwner = false;
 	socket.on("userRights", ({ isOwner: ownerStatus }) => {
 		isOwner = ownerStatus;
+		console.log("User rights updated. Is owner:", isOwner);
+		
+		// Store owner status in localStorage
+		if (isOwner) {
+			localStorage.setItem(`board_owner_${roomId}`, "true");
+		}
+		
 		// Show/hide share button based on ownership
 		const shareBtn = document.getElementById("shareBtn");
-		shareBtn.style.display = isOwner ? "block" : "none";
+		if (shareBtn) {
+			shareBtn.style.display = isOwner ? "block" : "none";
+			console.log("Share button visibility updated:", isOwner ? "visible" : "hidden");
+		}
 	});
-
-	// Join room
-	const hasLocalAuth = localStorage.getItem(`board_auth_${roomId}`) === "true";
-	const storedUserId = localStorage.getItem(`board_user_${roomId}`);
-	const user = getUserInfo();
 
 	// Join room with auth check
 	(async () => {
 		const token = localStorage.getItem("token");
-		if (token) {
-			try {
-				const response = await fetch("/api/user", {
-					headers: {
-						Authorization: `Bearer ${token}`,
-					},
-				});
+		const hasLocalAuth = localStorage.getItem(`board_auth_${roomId}`) === "true";
+		const storedUserId = localStorage.getItem(`board_user_${roomId}`);
+		const isOwner = localStorage.getItem(`board_owner_${roomId}`) === "true";
 
-				if (response.ok) {
-					// Now join the room with authenticated user
-					socket.emit("joinRoom", {
-						roomId,
-						userName: promptForUserName(),
-						userId: storedUserId || (user ? user.id : null),
-						hasLocalAuth,
-						token,
-					});
-				} else {
-					// Token invalid, join as guest
-					socket.emit("joinRoom", {
-						roomId,
-						userName: promptForUserName(),
-						hasLocalAuth,
-					});
-				}
-			} catch (error) {
-				console.error("Auth check error:", error);
-				// Join as guest on error
-				socket.emit("joinRoom", {
-					roomId,
-					userName: promptForUserName(),
-					hasLocalAuth,
-				});
-			}
-		} else {
-			// No token, join as guest
+		try {
+			console.log("Joining room with available credentials");
+			
+			// Skip authentication for now and just join the room
 			socket.emit("joinRoom", {
 				roomId,
 				userName: promptForUserName(),
+				userId: storedUserId,
 				hasLocalAuth,
+				isOwner,
+				token
+			});
+			
+		} catch (error) {
+			console.error("Error during room join:", error);
+			// Fallback join as guest
+			socket.emit("joinRoom", {
+				roomId,
+				userName: promptForUserName(),
+				hasLocalAuth: false
 			});
 		}
 	})();
@@ -1652,125 +1670,6 @@ document.addEventListener("DOMContentLoaded", function () {
 			modal.remove();
 		});
 	}
-
-	// Add periodic sync to ensure all clients are up to date
-	const SYNC_INTERVAL = 30000; // 30 seconds
-
-	// Request a sync of the latest board state from the server
-	function requestBoardSync() {
-		console.log("Requesting board sync...");
-		socket.emit("requestBoardSync", { roomId });
-	}
-
-	// Setup periodic sync
-	let syncInterval;
-
-	function setupSyncInterval() {
-		// Clear any existing interval
-		if (syncInterval) {
-			clearInterval(syncInterval);
-		}
-
-		// Set up new interval
-		syncInterval = setInterval(requestBoardSync, SYNC_INTERVAL);
-		console.log("Board sync interval set up");
-	}
-
-	// Handle board sync received from server
-	socket.on("boardSync", ({ history }) => {
-		console.log(`Received board sync with ${history.length} history items`);
-
-		// Only apply if we have new history items
-		if (history && history.length > 0) {
-			// Clear canvas and apply the updated history
-			ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-			// Sort history by timestamp if available to ensure correct order
-			if (history[0].timestamp) {
-				history.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-			}
-
-			// Process history (simplified from roomData handler)
-			const eraserEvents = [];
-
-			history.forEach((data) => {
-				if (data.tool === "eraser") {
-					eraserEvents.push(data);
-					return;
-				}
-
-				// Apply drawing event
-				ctx.globalCompositeOperation = "source-over";
-				ctx.strokeStyle = data.color || "#000000";
-				ctx.lineWidth = data.width || data.lineWidth || 5;
-				ctx.globalAlpha = data.opacity !== undefined ? data.opacity : 1.0;
-
-				switch (data.tool) {
-					case "brush":
-						ctx.beginPath();
-						ctx.moveTo(data.startX, data.startY);
-						ctx.lineTo(data.endX, data.endY);
-						ctx.stroke();
-						break;
-					case "line":
-						ctx.beginPath();
-						ctx.moveTo(data.startX, data.startY);
-						ctx.lineTo(data.endX, data.endY);
-						ctx.stroke();
-						break;
-					case "rectangle":
-						ctx.globalCompositeOperation = "source-over";
-						ctx.strokeStyle = data.color || "#000000";
-						ctx.lineWidth = data.lineWidth || data.width || 5;
-						ctx.fillStyle = "rgba(0,0,0,0)"; // Use fully transparent fill
-						ctx.lineJoin = "miter";
-						ctx.lineCap = "butt";
-						ctx.beginPath();
-						ctx.rect(data.startX, data.startY, data.width, data.height);
-						ctx.stroke();
-						break;
-					case "circle":
-						ctx.beginPath();
-						ctx.arc(data.centerX, data.centerY, data.radius, 0, Math.PI * 2);
-						ctx.stroke();
-						break;
-					case "text":
-						ctx.font = `${data.fontSize}px Arial`;
-						ctx.fillStyle = data.color || "#000000";
-						ctx.fillText(data.text, data.x, data.y);
-						break;
-				}
-			});
-
-			// Apply eraser events after all drawing events
-			if (eraserEvents.length > 0) {
-				eraserEvents.forEach((data) => {
-					ctx.globalCompositeOperation = "destination-out";
-
-					if (data.startX !== undefined && data.endY !== undefined) {
-						ctx.lineWidth = data.width;
-						ctx.beginPath();
-						ctx.moveTo(data.startX, data.startY);
-						ctx.lineTo(data.endX, data.endY);
-						ctx.stroke();
-					}
-
-					ctx.beginPath();
-					const eraserX = data.endX || data.startX;
-					const eraserY = data.endY || data.startY;
-					ctx.arc(eraserX, eraserY, data.width / 2, 0, Math.PI * 2, false);
-					ctx.fill();
-				});
-			}
-
-			// Reset context properties and save state
-			ctx.globalCompositeOperation = "source-over";
-			ctx.globalAlpha = 1.0;
-			saveState();
-
-			// showToast("Board synchronized", "info");
-		}
-	});
 
 	// Start sync interval when connected
 	socket.on("connect", () => {

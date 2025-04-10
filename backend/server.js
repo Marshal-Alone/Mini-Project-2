@@ -13,6 +13,7 @@ const User = require("./models/User");
 const Board = require("./models/Board");
 const bcrypt = require("bcryptjs");
 const mongoose = require("mongoose");
+const cors = require("cors");
 
 // Connect to MongoDB
 connectDB();
@@ -40,6 +41,11 @@ const io = new Server(server, {
 });
 
 // Middleware
+app.use(cors({
+	origin: "*",
+	methods: ["GET", "POST", "PUT", "DELETE"],
+	credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
