@@ -12,29 +12,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	}
 
 	// Socket.io setup
-	const socket = io("https://collaboard-backend-cdr6.onrender.com", {
-		transports: ["websocket"],
-		withCredentials: true,
-	});
-
-	// Connection status handling
-	socket.on("connect", () => {
-		console.log("Connected to server");
-		connectionStatus.innerHTML = '<i class="fas fa-circle" style="color: #4CAF50;"></i> Connected';
-	});
-
-	socket.on("disconnect", () => {
-		console.log("Disconnected from server");
-		connectionStatus.innerHTML =
-			'<i class="fas fa-circle" style="color: #f44336;"></i> Disconnected';
-	});
-
-	socket.on("connect_error", (error) => {
-		console.error("Connection error:", error);
-		connectionStatus.innerHTML =
-			'<i class="fas fa-circle" style="color: #f44336;"></i> Connection Error';
-	});
-
+	const socket = io();
 	let currentUserId = null;
 
 	// Get URL parameters
@@ -881,7 +859,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	const copyLinkBtn = document.getElementById("copyLinkBtn");
 
 	// Initially hide the share button until we confirm ownership
-	// shareBtn.style.display = "none";
+	shareBtn.style.display = "none";
 
 	shareBtn.addEventListener("click", () => {
 		// Set the share link
@@ -1105,7 +1083,7 @@ document.addEventListener("DOMContentLoaded", function () {
           </button>
           <button class="btn btn-primary" id="submitPasswordBtn">Join</button>
         </div>
-        <div id="passwordError" class="error-message" style="display: none;"></div>
+        <div id="passwordError" class="error-message" style="display: none;margin-top: 30px;"></div>
       </div>
     </div>
   `;
@@ -1140,8 +1118,10 @@ document.addEventListener("DOMContentLoaded", function () {
 		const errorElement = document.getElementById("passwordError");
 
 		if (!password) {
+			console.log("ho");
 			errorElement.textContent = "Please enter a password";
 			errorElement.style.display = "block";
+			errorElement.style.opacity = 1;
 			return;
 		}
 
@@ -1151,6 +1131,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Handle password check result
 	socket.on("passwordCheckResult", ({ success, message }) => {
+		console.log(message);
+		console.log("cjeck");
 		if (success) {
 			passwordModal.classList.remove("active");
 			const user = getUserInfo();

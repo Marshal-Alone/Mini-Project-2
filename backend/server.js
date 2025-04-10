@@ -32,63 +32,18 @@ mongoose
 
 const app = express();
 const server = http.createServer(app);
-
-// CORS configuration
-const corsOptions = {
-	origin: process.env.NODE_ENV === 'production' 
-		? ['https://collaborative-whiteboard-z8ai.onrender.com', 'https://online-whiteboard-mini-project.netlify.app']
-		: ['http://localhost:3000', '*'], // Allow localhost:3000 and all origins in development
-	methods: ['GET', 'POST', 'OPTIONS', 'PUT', 'DELETE'],
-	allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-	credentials: true,
-	preflightContinue: false,
-	optionsSuccessStatus: 204
-};
-
-// Apply CORS middleware before other middleware
-app.use((req, res, next) => {
-	const origin = req.headers.origin;
-	if (process.env.NODE_ENV === 'development' || corsOptions.origin.includes(origin)) {
-		res.setHeader('Access-Control-Allow-Origin', origin || '*');
-	}
-	res.setHeader('Access-Control-Allow-Methods', corsOptions.methods.join(','));
-	res.setHeader('Access-Control-Allow-Headers', corsOptions.allowedHeaders.join(','));
-	res.setHeader('Access-Control-Allow-Credentials', 'true');
-	res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
-	
-	// Handle preflight requests
-	if (req.method === 'OPTIONS') {
-		return res.status(corsOptions.optionsSuccessStatus).end();
-	}
-	
-	next();
-});
-
 const io = new Server(server, {
-	cors: corsOptions,
-	pingTimeout: 60000, // Increase ping timeout
-	pingInterval: 25000, // Increase ping interval
-	transports: ['websocket', 'polling'], // Prefer WebSocket
-	allowEIO3: true, // Allow Engine.IO v3 clients
-	path: '/socket.io/', // Explicit path
-	serveClient: false, // Don't serve client files
-	connectTimeout: 45000, // Connection timeout
-	upgradeTimeout: 30000, // Upgrade timeout
-	perMessageDeflate: {
-		threshold: 1024, // Only compress messages larger than 1KB
+	cors: {
+		origin: "*",
+		methods: ["GET", "POST"],
 	},
-	httpCompression: true
 });
 
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-
-// Serve static files in development only
-if (process.env.NODE_ENV !== 'production') {
-	app.use(express.static(path.join(__dirname, "../frontend")));
-}
+app.use(express.static(path.join(__dirname, "../frontend")));
 
 // Store room data
 const rooms = {};
@@ -115,39 +70,31 @@ app.post("/api/register", async (req, res) => {
 
 		// Validate input
 		if (!fullName || !email || !password) {
-			return res.status(400).json({ 
-				error: "All fields are required",
-				code: "MISSING_FIELDS"
-			});
+			return res.status(400).json({ error: "All fields are required" });
 		}
 
 		// Validate email format
 		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 		if (!emailRegex.test(email)) {
-			return res.status(400).json({ 
-				error: "Please enter a valid email address",
-				code: "INVALID_EMAIL"
-			});
+			return res.status(400).json({ error: "Please enter a valid email address" });
 		}
 
 		// Validate password length
 		if (password.length < 8) {
-			return res.status(400).json({ 
-				error: "Password must be at least 8 characters long",
-				code: "INVALID_PASSWORD"
-			});
+			return res.status(400).json({ error: "Password must be at least 8 characters long" });
 		}
 
-		// Check if user already exists
+		// Check if user already exists using findOne (more reliable than try-catch for duplicates)
 		const existingUser = await User.findOne({ email });
 		if (existingUser) {
-			return res.status(409).json({ 
-				error: "This email is already registered. Please try logging in instead.",
-				code: "EMAIL_EXISTS"
-			});
+			console.log(`Registration attempt with existing email: ${email}`);
+			return res
+				.status(409)
+				.json({ error: "This email is already registered. Please try logging in instead." });
 		}
 
-		// Create new user
+		// Create new user with plain password
+		// (it will be hashed by the User model's pre-save middleware)
 		const user = new User({
 			fullName,
 			email,
@@ -163,8 +110,11 @@ app.post("/api/register", async (req, res) => {
 			{ expiresIn: "24h" }
 		);
 
-		// Return success response
-		return res.status(201).json({
+		// Log new registration
+		console.log(`New user registered: ${email}`);
+
+		// Return user details and token
+		res.status(201).json({
 			token,
 			user: {
 				id: user._id,
@@ -174,20 +124,15 @@ app.post("/api/register", async (req, res) => {
 		});
 	} catch (error) {
 		console.error("Registration error:", error);
-		
-		// Handle duplicate email error from MongoDB
+
+		// Check specifically for MongoDB duplicate key error
 		if (error.code === 11000 && error.keyPattern && error.keyPattern.email) {
-			return res.status(409).json({ 
-				error: "This email is already registered. Please try logging in instead.",
-				code: "EMAIL_EXISTS"
-			});
+			return res
+				.status(409)
+				.json({ error: "This email is already registered. Please try logging in instead." });
 		}
-		
-		// Handle other errors
-		return res.status(500).json({ 
-			error: "Registration failed. Please try again later.",
-			code: "SERVER_ERROR"
-		});
+
+		res.status(500).json({ error: "Registration failed. Please try again later." });
 	}
 });
 
@@ -197,10 +142,7 @@ app.post("/api/login", async (req, res) => {
 
 		// Validate input
 		if (!email || !password) {
-			return res.status(400).json({ 
-				error: "Email and password are required",
-				code: "MISSING_FIELDS"
-			});
+			return res.status(400).json({ error: "Email and password are required" });
 		}
 
 		// Find user by email
@@ -208,10 +150,7 @@ app.post("/api/login", async (req, res) => {
 
 		// Check if user exists
 		if (!user) {
-			return res.status(401).json({ 
-				error: "Invalid email or password",
-				code: "ACCOUNT_NOT_FOUND"
-			});
+			return res.status(401).json({ error: "Invalid email or password" });
 		}
 
 		// Compare passwords
@@ -220,10 +159,7 @@ app.post("/api/login", async (req, res) => {
 		if (!isPasswordValid) {
 			// Log failed login attempt
 			console.log(`Failed login attempt for email: ${email}`);
-			return res.status(401).json({ 
-				error: "Invalid email or password",
-				code: "INVALID_CREDENTIALS"
-			});
+			return res.status(401).json({ error: "Invalid email or password" });
 		}
 
 		// Create JWT token
@@ -237,7 +173,7 @@ app.post("/api/login", async (req, res) => {
 		console.log(`User logged in: ${email}`);
 
 		// Return user details and token
-		return res.status(200).json({
+		res.status(200).json({
 			token,
 			user: {
 				id: user._id,
@@ -247,10 +183,7 @@ app.post("/api/login", async (req, res) => {
 		});
 	} catch (error) {
 		console.error("Login error:", error);
-		return res.status(500).json({ 
-			error: "Login failed. Please try again later.",
-			code: "SERVER_ERROR"
-		});
+		res.status(500).json({ error: "Login failed. Please try again later." });
 	}
 });
 
@@ -387,77 +320,12 @@ app.get("/api/boards/code/:code", async (req, res) => {
 	}
 });
 
-// Performance monitoring and optimization
-const performanceMetrics = {
-	lastCleanup: Date.now(),
-	cleanupInterval: 5 * 60 * 1000, // 5 minutes
-	eventCounts: {},
-	maxEventsPerSecond: 100,
-	throttleDelay: 1000 // 1 second
-};
-
-// Cleanup function to prevent memory leaks
-const cleanupInactiveRooms = () => {
-	const now = Date.now();
-	const inactiveThreshold = 30 * 60 * 1000; // 30 minutes
-
-	for (const roomId in rooms) {
-		const room = rooms[roomId];
-		let hasActiveUsers = false;
-
-		for (const socketId in room.users) {
-			const user = room.users[socketId];
-			if (now - user.lastActive < inactiveThreshold) {
-				hasActiveUsers = true;
-				break;
-			}
-		}
-
-		if (!hasActiveUsers) {
-			delete rooms[roomId];
-			console.log(`Cleaned up inactive room: ${roomId}`);
-		}
-	}
-
-	performanceMetrics.lastCleanup = now;
-};
-
-// Event throttling to prevent overload
-const throttleEvents = (socket, eventType) => {
-	const now = Date.now();
-	const key = `${socket.id}-${eventType}`;
-	
-	if (!performanceMetrics.eventCounts[key]) {
-		performanceMetrics.eventCounts[key] = {
-			count: 0,
-			lastReset: now
-		};
-	}
-
-	const metrics = performanceMetrics.eventCounts[key];
-	
-	if (now - metrics.lastReset >= 1000) {
-		metrics.count = 0;
-		metrics.lastReset = now;
-	}
-
-	metrics.count++;
-
-	if (metrics.count > performanceMetrics.maxEventsPerSecond) {
-		return true; // Throttle this event
-	}
-
-	return false; // Allow this event
-};
-
-// Regular cleanup interval
-setInterval(cleanupInactiveRooms, performanceMetrics.cleanupInterval);
-
 // Socket.io connection handling
 // Socket.io optimization settings
 io.engine.pingInterval = 25000; // Increased ping interval
 io.engine.pingTimeout = 60000; // Increased timeout
 io.engine.maxHttpBufferSize = 1e8; // Increased buffer size for large messages
+io.engine.transports = ['websocket']; // Force WebSocket only for better performance
 
 // Configure socket middleware for performance
 io.use(async (socket, next) => {
@@ -470,83 +338,260 @@ io.on("connection", (socket) => {
 	socket.conn.on("packet", (packet) => {
 		if (packet.type === "ping") socket.conn.packetsFn = []; // Clear packet buffer on ping
 	});
+	// a user connected
+	console.log("A user connected:", socket.id);
 
-	// Optimize room joining
+	// Join a room
 	socket.on("joinRoom", async ({ roomId, userName, userId, password, hasLocalAuth }) => {
+		let roomName;
 		try {
-			// Batch database operations
-			const [board, existingUsers] = await Promise.all([
-				Board.findOne({ roomId }),
-				Object.values(rooms[roomId]?.users || {})
-			]);
+			const board = await Board.findOne({ roomId });
+			roomName = board ? board.name : roomId;
+		} catch (error) {
+			roomName = roomId;
+		}
+		// console.log(`User ${userName} attempting to join room ${roomName}`);
 
-			// Quick validation
-			if (board?.isPasswordProtected && !hasLocalAuth) {
-				if (!password || password !== board.password) {
-					socket.emit("passwordRequired", { roomId });
-					return;
+		try {
+			const boardForAuth = await Board.findOne({ roomId });
+
+			if (boardForAuth && boardForAuth.isPasswordProtected) {
+				const isOwner = userId && boardForAuth.createdBy === userId;
+				const isAuthorized = rooms[roomId]?.authorizedUsers?.includes(userId || socket.id);
+
+				if (!isOwner && !isAuthorized && !hasLocalAuth) {
+					if (!password || password !== boardForAuth.password) {
+						socket.emit("passwordRequired", { roomId });
+						return;
+					}
+
+					if (userId) {
+						if (!rooms[roomId]) rooms[roomId] = { users: {}, authorizedUsers: [] };
+						rooms[roomId].authorizedUsers.push(userId);
+					}
 				}
 			}
 
-			// Optimize room data structure
+			// Add user to room in memory
 			if (!rooms[roomId]) {
 				rooms[roomId] = {
 					users: {},
 					authorizedUsers: [],
-					lastSync: Date.now()
 				};
 			}
 
-			// Handle reconnection efficiently
-			const existingSocketId = userId ? 
-				Object.keys(rooms[roomId].users).find(id => 
-					rooms[roomId].users[id].userId === userId
-				) : null;
+			// Check if this userId is already in the room with a different socket
+			let existingSocketId = null;
+			if (userId) {
+				for (const socketId in rooms[roomId].users) {
+					if (rooms[roomId].users[socketId].userId === userId) {
+						existingSocketId = socketId;
+						break;
+					}
+				}
+			}
 
+			// If user exists with different socket ID, remove the old entry
 			if (existingSocketId && existingSocketId !== socket.id) {
+				console.log(`User ${userName} reconnected with new socket. Replacing old socket.`);
 				delete rooms[roomId].users[existingSocketId];
 			}
 
-			// Add user with optimized data structure
-			rooms[roomId].users[socket.id] = {
-				id: socket.id,
-				userId: userId || socket.id,
+			// Add user details
+			const socketId = socket.id;
+			const userColor = getRandomColor();
+			const userInitial = userName.charAt(0).toUpperCase();
+
+			rooms[roomId].users[socketId] = {
+				id: socketId,
+				userId: userId || socketId,
 				name: userName,
-				color: getRandomColor(),
-				initial: userName.charAt(0).toUpperCase(),
-				lastActive: Date.now()
+				color: userColor,
+				initial: userInitial,
 			};
 
-			// Join room and set properties
+			// Join the room
 			socket.join(roomId);
 			socket.roomId = roomId;
 
-			// Send initial room data efficiently
-			const roomData = {
+			// Find or create board in the database
+			let board = await Board.findOne({ roomId }).select({
+				history: 1,
+				name: 1,
+				roomId: 1,
+				createdBy: 1,
+			});
+
+			if (!board) {
+				console.log(`Creating new board for room ${roomId}`);
+				board = new Board({
+					roomId,
+					name: roomId, // Default name is the roomId
+					history: [],
+					createdBy: userId || socketId,
+				});
+				await board.save();
+			} else {
+				console
+					.log
+					// `Found existing board for room ${roomId} with ${board.history.length} history items`
+					();
+			}
+
+			// Send board history from database to the new user
+			console
+				.log
+				// `Sending room data to user ${userName} with ${board.history.length} history items`
+				();
+			socket.emit("roomData", {
 				users: Object.values(rooms[roomId].users),
-				history: board?.history || [],
-				lastSync: rooms[roomId].lastSync
-			};
+				history: board.history || [],
+			});
 
-			socket.emit("roomData", roomData);
-			socket.to(roomId).emit("userJoined", rooms[roomId].users[socket.id]);
-			socket.to(roomId).emit("userCount", Object.keys(rooms[roomId].users).length);
+			// Notify all clients about the new user
+			io.to(roomId).emit("userJoined", rooms[roomId].users[socketId]);
+			io.to(roomId).emit("userCount", Object.keys(rooms[roomId].users).length);
 
+			// console.log(`User ${userName} joined room ${roomName} successfully`);
 		} catch (error) {
 			console.error("Error joining room:", error);
 			socket.emit("error", { message: "Error joining room" });
 		}
 	});
 
-	// Optimize drawing event handling
-	socket.on("drawEvent", async (data) => {
-		if (throttleEvents(socket, "drawEvent")) {
-			socket.emit("throttleWarning", {
-				message: "Drawing events are being throttled to maintain performance"
-			});
-			return;
-		}
+	// Check password for a room
+	socket.on("checkRoomPassword", async ({ roomId, password }) => {
+		try {
+			const board = await Board.findOne({ roomId });
 
+			if (!board) {
+				socket.emit("passwordCheckResult", {
+					success: false,
+					message: "Room not found",
+				});
+				return;
+			}
+
+			if (!board.isPasswordProtected) {
+				socket.emit("passwordCheckResult", {
+					success: true,
+					message: "No password required",
+				});
+				return;
+			}
+
+			const passwordMatches = password === board.password;
+
+			if (passwordMatches) {
+				// Add to authorized users
+				if (!rooms[roomId]) {
+					rooms[roomId] = { users: {}, authorizedUsers: [] };
+				}
+
+				if (!rooms[roomId].authorizedUsers) {
+					rooms[roomId].authorizedUsers = [];
+				}
+
+				rooms[roomId].authorizedUsers.push(socket.id);
+
+				socket.emit("passwordCheckResult", {
+					success: true,
+					message: "Password correct",
+				});
+			} else {
+				socket.emit("passwordCheckResult", {
+					success: false,
+					message: "Incorrect password",
+				});
+			}
+		} catch (error) {
+			console.error("Error checking room password:", error);
+			socket.emit("passwordCheckResult", {
+				success: false,
+				message: "Error checking password",
+			});
+		}
+	});
+
+	// Set room password
+	socket.on("setRoomPassword", async ({ roomId, password }) => {
+		try {
+			// Get board info
+			const board = await Board.findOne({ roomId });
+
+			if (!board) {
+				socket.emit("error", { message: "Board not found" });
+				return;
+			}
+
+			// Update password
+			board.isPasswordProtected = true;
+			board.password = password;
+			await board.save();
+
+			// Notify other users in the room that the room now requires a password
+			socket.to(roomId).emit("roomPasswordUpdated", true);
+
+			console.log(`Password set for room: ${roomId}`);
+		} catch (error) {
+			console.error("Error setting room password:", error);
+			socket.emit("error", { message: "Error setting password" });
+		}
+	});
+
+	// Remove room password
+	socket.on("removeRoomPassword", async ({ roomId }) => {
+		try {
+			// Get board info
+			const board = await Board.findOne({ roomId });
+
+			if (!board) {
+				socket.emit("error", { message: "Board not found" });
+				return;
+			}
+
+			// Remove password
+			board.isPasswordProtected = false;
+			board.password = "";
+			await board.save();
+
+			// Clear authorized users list
+			if (rooms[roomId] && rooms[roomId].authorizedUsers) {
+				rooms[roomId].authorizedUsers = [];
+			}
+
+			// Notify other users in the room
+			socket.to(roomId).emit("roomPasswordUpdated", false);
+
+			console.log(`Password removed for room: ${roomId}`);
+		} catch (error) {
+			console.error("Error removing room password:", error);
+			socket.emit("error", { message: "Error removing password" });
+		}
+	});
+
+	// When a user is fully connected to a room
+	socket.on("userReady", async ({ roomId }) => {
+		try {
+			// Get board info from database
+			const boardInfo = await Board.findOne({ roomId });
+
+			// Send password status
+			if (boardInfo) {
+				socket.emit("roomPasswordStatus", boardInfo.isPasswordProtected);
+
+				// Send if user is owner
+				const userId = rooms[roomId].users[socket.id].userId;
+				const isOwner = userId && boardInfo.createdBy === userId;
+				socket.emit("userRights", { isOwner });
+			}
+		} catch (error) {
+			console.error("Error in userReady:", error);
+		}
+	});
+
+	// Handle drawing events with optimized performance
+	socket.on("drawEvent", async (data) => {
 		const roomId = socket.roomId;
 		if (!roomId) return;
 
@@ -554,10 +599,10 @@ io.on("connection", (socket) => {
 		data.timestamp = data.timestamp || Date.now();
 		data.senderId = socket.id;
 
-		// Broadcast efficiently
+		// Broadcast immediately without waiting for database
 		socket.to(roomId).emit("drawEvent", data);
 
-		// Batch database updates
+		// Save to database in background
 		try {
 			await Board.updateOne(
 				{ roomId },
@@ -574,56 +619,110 @@ io.on("connection", (socket) => {
 					}
 				}
 			);
-
-			// Update room's last sync time
-			if (rooms[roomId]) {
-				rooms[roomId].lastSync = Date.now();
-			}
 		} catch (error) {
 			console.error("Error saving drawing event:", error);
 		}
 	});
 
-	// Optimize board sync
-	socket.on("requestBoardSync", async ({ roomId }) => {
+	// Handle clear canvas event
+	socket.on("clearCanvas", async () => {
+		const roomId = socket.roomId;
 		if (!roomId) return;
 
-		try {
-			const board = await Board.findOne({ roomId }).select({ 
-				history: 1,
-				lastSync: 1
-			});
+		// Broadcast immediately
+		socket.to(roomId).emit("clearCanvas");
 
-			if (board) {
-				socket.emit("boardSync", {
-					history: board.history,
-					lastSync: board.lastSync
-				});
-			}
+		// Clear history in database in background
+		try {
+			await Board.updateOne(
+				{ roomId },
+				{
+					$set: {
+						history: [],
+						updatedAt: Date.now()
+					}
+				}
+			);
 		} catch (error) {
-			console.error("Error syncing board:", error);
+			console.error("Error clearing board history:", error);
 		}
 	});
 
-	// Handle disconnection efficiently
+	// Handle disconnection
 	socket.on("disconnect", async () => {
 		const roomId = socket.roomId;
-		if (!roomId || !rooms[roomId]) return;
+		const userName = rooms[roomId]?.users[socket.id]?.name || "Unknown User";
+		console.log(`User disconnected: ${userName}`);
 
-		const userInfo = rooms[roomId].users[socket.id];
-		delete rooms[roomId].users[socket.id];
+		// Find which room this socket was in
+		if (roomId && rooms[roomId] && rooms[roomId].users) {
+			// Get user info before removing
+			const userInfo = rooms[roomId].users[socket.id];
 
-		if (userInfo) {
-			io.to(roomId).emit("userLeft", {
-				id: socket.id,
-				name: userInfo.name
-			});
+			// Remove user from room
+			delete rooms[roomId].users[socket.id];
+
+			// Notify other users with more information
+			if (userInfo) {
+				io.to(roomId).emit("userLeft", {
+					id: socket.id,
+					name: userInfo.name || "Unknown User",
+				});
+			} else {
+				io.to(roomId).emit("userLeft", {
+					id: socket.id,
+					name: "Unknown User",
+				});
+			}
+
 			io.to(roomId).emit("userCount", Object.keys(rooms[roomId].users).length);
-		}
 
-		// Clean up empty rooms
-		if (Object.keys(rooms[roomId].users).length === 0) {
-			delete rooms[roomId];
+			// If room is empty, clean up (but don't delete from DB)
+			if (Object.keys(rooms[roomId].users).length === 0) {
+				delete rooms[roomId];
+				// Get board name if available
+				try {
+					const board = await Board.findOne({ roomId });
+					const roomName = board ? board.name : roomId;
+					console.log(`Room "${roomName}" is now empty and removed from memory`);
+				} catch (error) {
+					console.log(`Room ${roomId} is now empty and removed from memory`);
+				}
+			}
+		}
+	});
+
+	// Handle board sync requests
+	socket.on("requestBoardSync", async ({ roomId }) => {
+		try {
+			// if (!roomId) {
+			// 	// console.log("Board sync requested with no roomId");
+			// 	return;
+			// }
+
+			const userName = rooms[roomId]?.users[socket.id]?.name || "Unknown User";
+			// console.log(`Board sync requested for room ${roomId} by ${userName}`);
+
+			// Get the latest board data from the database
+			const board = await Board.findOne({ roomId }).select({ history: 1 });
+
+			if (board && board.history) {
+				console
+					.log
+					// `Sending board sync with ${board.history.length} history items to ${socket.id}`
+					();
+
+				// Send the full history back to the requesting client
+				socket.emit("boardSync", {
+					history: board.history,
+				});
+			} else {
+				console.log(`No board found for sync request on room ${roomId}`);
+				socket.emit("error", { message: "Board not found for sync" });
+			}
+		} catch (error) {
+			console.error("Error syncing board:", error);
+			socket.emit("error", { message: "Error syncing board" });
 		}
 	});
 });
@@ -798,11 +897,6 @@ async function startServer() {
 	// Start the server
 	server.listen(PORT, () => {
 		console.log(`Server running on port ${PORT}`);
-		console.log("Performance optimizations enabled:");
-		console.log("- WebSocket ping interval: 25s");
-		console.log("- Event throttling: 100 events/second");
-		console.log("- Room cleanup: every 5 minutes");
-		console.log("- Inactive room timeout: 30 minutes");
 	});
 
 	// Handle any errors that might still occur
