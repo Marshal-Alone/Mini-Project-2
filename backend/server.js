@@ -22,7 +22,7 @@ mongoose
 		useNewUrlParser: true,
 		useUnifiedTopology: true,
 		retryWrites: true,
-		w: 'majority'
+		w: "majority",
 	})
 	.then(() => {
 		console.log("");
@@ -32,18 +32,67 @@ mongoose
 
 const app = express();
 const server = http.createServer(app);
+
+// CORS configuration
+const corsOptions = {
+	origin:
+		process.env.NODE_ENV === "production"
+			? [
+					"https://collaborative-whiteboard-z8ai.onrender.com",
+					"https://online-whiteboard-mini-project.netlify.app",
+			  ]
+			: ["http://localhost:3000", "*"], // Allow localhost:3000 and all origins in development
+	methods: ["GET", "POST", "OPTIONS", "PUT", "DELETE"],
+	allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+	credentials: true,
+	preflightContinue: false,
+	optionsSuccessStatus: 204,
+};
+
+// Apply CORS middleware before other middleware
+app.use((req, res, next) => {
+	const origin = req.headers.origin;
+	if (process.env.NODE_ENV === "development" || corsOptions.origin.includes(origin)) {
+		res.setHeader("Access-Control-Allow-Origin", origin || "*");
+	}
+	res.setHeader("Access-Control-Allow-Methods", corsOptions.methods.join(","));
+	res.setHeader("Access-Control-Allow-Headers", corsOptions.allowedHeaders.join(","));
+	res.setHeader("Access-Control-Allow-Credentials", "true");
+	res.setHeader("Access-Control-Max-Age", "86400"); // 24 hours
+
+	// Handle preflight requests
+	if (req.method === "OPTIONS") {
+		return res.status(corsOptions.optionsSuccessStatus).end();
+	}
+
+	next();
+});
+
 const io = new Server(server, {
-	cors: {
-		origin: "*",
-		methods: ["GET", "POST"],
+	cors: corsOptions,
+	pingTimeout: 60000, // Increase ping timeout
+	pingInterval: 25000, // Increase ping interval
+	transports: ["websocket", "polling"], // Prefer WebSocket
+	allowEIO3: true, // Allow Engine.IO v3 clients
+	path: "/socket.io/", // Explicit path
+	serveClient: false, // Don't serve client files
+	connectTimeout: 45000, // Connection timeout
+	upgradeTimeout: 30000, // Upgrade timeout
+	perMessageDeflate: {
+		threshold: 1024, // Only compress messages larger than 1KB
 	},
+	httpCompression: true,
 });
 
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use(express.static(path.join(__dirname, "../frontend")));
+
+// Serve static files in development only
+if (process.env.NODE_ENV !== "production") {
+	app.use(express.static(path.join(__dirname, "../frontend")));
+}
 
 // Store room data
 const rooms = {};
@@ -84,17 +133,15 @@ app.post("/api/register", async (req, res) => {
 			return res.status(400).json({ error: "Password must be at least 8 characters long" });
 		}
 
-		// Check if user already exists using findOne (more reliable than try-catch for duplicates)
+		// Check if user already exists
 		const existingUser = await User.findOne({ email });
 		if (existingUser) {
-			console.log(`Registration attempt with existing email: ${email}`);
 			return res
 				.status(409)
 				.json({ error: "This email is already registered. Please try logging in instead." });
 		}
 
-		// Create new user with plain password
-		// (it will be hashed by the User model's pre-save middleware)
+		// Create new user
 		const user = new User({
 			fullName,
 			email,
@@ -110,11 +157,8 @@ app.post("/api/register", async (req, res) => {
 			{ expiresIn: "24h" }
 		);
 
-		// Log new registration
-		console.log(`New user registered: ${email}`);
-
-		// Return user details and token
-		res.status(201).json({
+		// Return success response
+		return res.status(201).json({
 			token,
 			user: {
 				id: user._id,
@@ -125,14 +169,15 @@ app.post("/api/register", async (req, res) => {
 	} catch (error) {
 		console.error("Registration error:", error);
 
-		// Check specifically for MongoDB duplicate key error
+		// Handle duplicate email error from MongoDB
 		if (error.code === 11000 && error.keyPattern && error.keyPattern.email) {
 			return res
 				.status(409)
 				.json({ error: "This email is already registered. Please try logging in instead." });
 		}
 
-		res.status(500).json({ error: "Registration failed. Please try again later." });
+		// Handle other errors
+		return res.status(500).json({ error: "Registration failed. Please try again later." });
 	}
 });
 
@@ -173,7 +218,7 @@ app.post("/api/login", async (req, res) => {
 		console.log(`User logged in: ${email}`);
 
 		// Return user details and token
-		res.status(200).json({
+		return res.status(200).json({
 			token,
 			user: {
 				id: user._id,
@@ -183,7 +228,7 @@ app.post("/api/login", async (req, res) => {
 		});
 	} catch (error) {
 		console.error("Login error:", error);
-		res.status(500).json({ error: "Login failed. Please try again later." });
+		return res.status(500).json({ error: "Login failed. Please try again later." });
 	}
 });
 
@@ -320,14 +365,81 @@ app.get("/api/boards/code/:code", async (req, res) => {
 	}
 });
 
+// Performance monitoring and optimization
+const performanceMetrics = {
+	lastCleanup: Date.now(),
+	cleanupInterval: 5 * 60 * 1000, // 5 minutes
+	eventCounts: {},
+	maxEventsPerSecond: 100,
+	throttleDelay: 1000, // 1 second
+};
+
+// Cleanup function to prevent memory leaks
+const cleanupInactiveRooms = () => {
+	const now = Date.now();
+	const inactiveThreshold = 30 * 60 * 1000; // 30 minutes
+
+	for (const roomId in rooms) {
+		const room = rooms[roomId];
+		let hasActiveUsers = false;
+
+		for (const socketId in room.users) {
+			const user = room.users[socketId];
+			if (now - user.lastActive < inactiveThreshold) {
+				hasActiveUsers = true;
+				break;
+			}
+		}
+
+		if (!hasActiveUsers) {
+			delete rooms[roomId];
+			console.log(`Cleaned up inactive room: ${roomId}`);
+		}
+	}
+
+	performanceMetrics.lastCleanup = now;
+};
+
+// Event throttling to prevent overload
+const throttleEvents = (socket, eventType) => {
+	const now = Date.now();
+	const key = `${socket.id}-${eventType}`;
+
+	if (!performanceMetrics.eventCounts[key]) {
+		performanceMetrics.eventCounts[key] = {
+			count: 0,
+			lastReset: now,
+		};
+	}
+
+	const metrics = performanceMetrics.eventCounts[key];
+
+	if (now - metrics.lastReset >= 1000) {
+		metrics.count = 0;
+		metrics.lastReset = now;
+	}
+
+	metrics.count++;
+
+	if (metrics.count > performanceMetrics.maxEventsPerSecond) {
+		return true; // Throttle this event
+	}
+
+	return false; // Allow this event
+};
+
+// Regular cleanup interval
+setInterval(cleanupInactiveRooms, performanceMetrics.cleanupInterval);
+
 // Socket.io connection handling
 // Socket.io optimization settings
-io.engine.pingInterval = 1000; // Reduced ping interval for faster reconnects
-io.engine.pingTimeout = 2000; // Shorter timeout
+io.engine.pingInterval = 25000; // Increased ping interval
+io.engine.pingTimeout = 60000; // Increased timeout
+io.engine.maxHttpBufferSize = 1e8; // Increased buffer size for large messages
 
 // Configure socket middleware for performance
 io.use(async (socket, next) => {
-	socket.setMaxListeners(20); // Increase max listeners for better event handling
+	socket.setMaxListeners(20); // Increase max listeners
 	next();
 });
 
@@ -336,6 +448,7 @@ io.on("connection", (socket) => {
 	socket.conn.on("packet", (packet) => {
 		if (packet.type === "ping") socket.conn.packetsFn = []; // Clear packet buffer on ping
 	});
+
 	// a user connected
 	console.log("A user connected:", socket.id);
 
@@ -348,7 +461,6 @@ io.on("connection", (socket) => {
 		} catch (error) {
 			roomName = roomId;
 		}
-		// console.log(`User ${userName} attempting to join room ${roomName}`);
 
 		try {
 			const boardForAuth = await Board.findOne({ roomId });
@@ -358,15 +470,27 @@ io.on("connection", (socket) => {
 				const isAuthorized = rooms[roomId]?.authorizedUsers?.includes(userId || socket.id);
 
 				if (!isOwner && !isAuthorized && !hasLocalAuth) {
-					if (!password || password !== boardForAuth.password) {
+					if (!password) {
 						socket.emit("passwordRequired", { roomId });
 						return;
 					}
 
-					if (userId) {
-						if (!rooms[roomId]) rooms[roomId] = { users: {}, authorizedUsers: [] };
-						rooms[roomId].authorizedUsers.push(userId);
+					if (password !== boardForAuth.password) {
+						socket.emit("passwordCheckResult", {
+							success: false,
+							message: "Incorrect password",
+						});
+						return;
 					}
+
+					// Password is correct, add to authorized users
+					if (!rooms[roomId]) {
+						rooms[roomId] = { users: {}, authorizedUsers: [] };
+					}
+					if (!rooms[roomId].authorizedUsers) {
+						rooms[roomId].authorizedUsers = [];
+					}
+					rooms[roomId].authorizedUsers.push(userId || socket.id);
 				}
 			}
 
@@ -429,18 +553,9 @@ io.on("connection", (socket) => {
 					createdBy: userId || socketId,
 				});
 				await board.save();
-			} else {
-				console
-					.log
-					// `Found existing board for room ${roomId} with ${board.history.length} history items`
-					();
 			}
 
 			// Send board history from database to the new user
-			console
-				.log
-				// `Sending room data to user ${userName} with ${board.history.length} history items`
-				();
 			socket.emit("roomData", {
 				users: Object.values(rooms[roomId].users),
 				history: board.history || [],
@@ -449,8 +564,6 @@ io.on("connection", (socket) => {
 			// Notify all clients about the new user
 			io.to(roomId).emit("userJoined", rooms[roomId].users[socketId]);
 			io.to(roomId).emit("userCount", Object.keys(rooms[roomId].users).length);
-
-			// console.log(`User ${userName} joined room ${roomName} successfully`);
 		} catch (error) {
 			console.error("Error joining room:", error);
 			socket.emit("error", { message: "Error joining room" });
@@ -588,7 +701,7 @@ io.on("connection", (socket) => {
 		}
 	});
 
-	// Handle drawing events - moved out of userReady
+	// Handle drawing events
 	socket.on("drawEvent", async (data) => {
 		const roomId = socket.roomId;
 
@@ -609,14 +722,8 @@ io.on("connection", (socket) => {
 						$push: { history: data },
 						$set: { updatedAt: Date.now() },
 					},
-					{ new: true } // Return the updated document
+					{ new: true }
 				);
-
-				// Log occasional updates to track drawing activity
-				if (Math.random() < 0.01) {
-					// Only log 1% of events to avoid spam
-					console.log(`Drawing event saved for board ${roomId}, tool: ${data.tool}`);
-				}
 			}
 		} catch (error) {
 			console.error("Error saving drawing event:", error);
@@ -624,7 +731,7 @@ io.on("connection", (socket) => {
 		}
 	});
 
-	// Handle clear canvas event - moved out of userReady
+	// Handle clear canvas event
 	socket.on("clearCanvas", async () => {
 		const roomId = socket.roomId;
 
@@ -698,23 +805,12 @@ io.on("connection", (socket) => {
 	// Handle board sync requests
 	socket.on("requestBoardSync", async ({ roomId }) => {
 		try {
-			// if (!roomId) {
-			// 	// console.log("Board sync requested with no roomId");
-			// 	return;
-			// }
-
 			const userName = rooms[roomId]?.users[socket.id]?.name || "Unknown User";
-			// console.log(`Board sync requested for room ${roomId} by ${userName}`);
 
 			// Get the latest board data from the database
 			const board = await Board.findOne({ roomId }).select({ history: 1 });
 
 			if (board && board.history) {
-				console
-					.log
-					// `Sending board sync with ${board.history.length} history items to ${socket.id}`
-					();
-
 				// Send the full history back to the requesting client
 				socket.emit("boardSync", {
 					history: board.history,
@@ -787,7 +883,7 @@ const createTestUser = async () => {
 };
 
 // Start server
-const PORT = process.env.PORT || 5050;
+const PORT = process.env.PORT || 3000;
 
 // Function to check if port is in use
 function isPortInUse(port) {
@@ -900,6 +996,11 @@ async function startServer() {
 	// Start the server
 	server.listen(PORT, () => {
 		console.log(`Server running on port ${PORT}`);
+		console.log("Performance optimizations enabled:");
+		console.log("- WebSocket ping interval: 25s");
+		console.log("- Event throttling: 100 events/second");
+		console.log("- Room cleanup: every 5 minutes");
+		console.log("- Inactive room timeout: 30 minutes");
 	});
 
 	// Handle any errors that might still occur
