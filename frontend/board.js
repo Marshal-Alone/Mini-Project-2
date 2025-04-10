@@ -1083,7 +1083,7 @@ document.addEventListener("DOMContentLoaded", function () {
           </button>
           <button class="btn btn-primary" id="submitPasswordBtn">Join</button>
         </div>
-        <div id="passwordError" class="error-message" style="display: none;"></div>
+        <div id="passwordError" class="error-message" style="display: none;margin-top: 30px;"></div>
       </div>
     </div>
   `;
@@ -1118,8 +1118,10 @@ document.addEventListener("DOMContentLoaded", function () {
 		const errorElement = document.getElementById("passwordError");
 
 		if (!password) {
+			console.log("ho");
 			errorElement.textContent = "Please enter a password";
 			errorElement.style.display = "block";
+			errorElement.style.opacity = 1;
 			return;
 		}
 
@@ -1129,6 +1131,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Handle password check result
 	socket.on("passwordCheckResult", ({ success, message }) => {
+		console.log(message);
+		console.log("cjeck");
 		if (success) {
 			passwordModal.classList.remove("active");
 			const user = getUserInfo();
