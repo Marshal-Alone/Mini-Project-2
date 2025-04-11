@@ -213,32 +213,27 @@
     </div>
   </div>
 
-  <div id="brushSettings" class="tool-settings" style="display: none;">
-    <div class="settings-header">
-      <h3>Brush Settings</h3>
-      <button class="settings-close-btn" data-target="brushSettings"><i class="fas fa-times"></i></button>
-    </div>
+  <div id="brushSettings" class="brush-settings eraser-settings" style="display: none;">
+    <h3>Brush Settings</h3>
     <label for="brushColor">Brush Color:</label>
     <input type="color" id="brushColor" value="#000000">
 
     <label for="brushSizeSlider">Brush Size:</label>
-    <input type="range" id="brushSizeSlider" min="1" max="100" value="5" class="size-slider">
+    <input type="range" id="brushSizeSlider" min="1" max="100" value="5">
+
+    <!-- <label for="brushOpacity">Opacity:</label> -->
+    <!-- <input type="range" id="brushOpacity" min="0" max="100" value="100"> -->
   </div>
 
-  <div id="eraserSettings" class="tool-settings" style="display: none;">
-    <div class="settings-header">
-      <h3>Eraser Settings</h3>
-      <button class="settings-close-btn" data-target="eraserSettings"><i class="fas fa-times"></i></button>
-    </div>
+  <div id="eraserSettings" class="eraser-settings" style="display: none;">
+    <h3>Eraser Settings</h3>
     <label for="eraserSize">Eraser Size:</label>
     <input type="range" id="eraserSize" min="5" max="70" value="30" class="size-slider">
+    <!-- <div id="eraserSizeControl"></div> -->
   </div>
 
-  <div id="textSettings" class="tool-settings" style="display: none;">
-    <div class="settings-header">
-      <h3>Text Settings</h3>
-      <button class="settings-close-btn" data-target="textSettings"><i class="fas fa-times"></i></button>
-    </div>
+  <div id="textSettings" class="text-settings eraser-settings" style="display: none;">
+    <h3>Text Settings</h3>
     <label for="textColor">Text Color:</label>
     <input type="color" id="textColor" value="#000000">
     
@@ -246,37 +241,30 @@
     <input type="range" id="textSize" min="10" max="72" value="24" class="size-slider">
   </div>
 
-  <div id="lineSettings" class="tool-settings" style="display: none;">
-    <div class="settings-header">
-      <h3>Line Settings</h3>
-      <button class="settings-close-btn" data-target="lineSettings"><i class="fas fa-times"></i></button>
-    </div>
+  <!-- NO NEED -->
+  <div id="lineSettings" class="tool-settings eraser-settings" style="display: none;">
+    <h3>Line Settings</h3>
     <label for="lineColor">Line Color:</label>
     <input type="color" id="lineColor" value="#000000">
     <label for="lineSize">Line Size:</label>
     <input type="range" id="lineSize" min="1" max="20" value="2" class="size-slider">
   </div>
 
-  <div id="rectangleSettings" class="tool-settings" style="display: none;">
-    <div class="settings-header">
-      <h3>Rectangle Settings</h3>
-      <button class="settings-close-btn" data-target="rectangleSettings"><i class="fas fa-times"></i></button>
-    </div>
+  <div id="rectangleSettings" class="tool-settings eraser-settings" style="display: none;">
+    <h3>Rectangle Settings</h3>
     <label for="rectangleColor">Rectangle Color:</label>
     <input type="color" id="rectangleColor" value="#000000">
     <label for="rectangleSize">Line Size:</label>
     <input type="range" id="rectangleSize" min="1" max="20" value="2" class="size-slider">
   </div>
 
-  <div id="circleSettings" class="tool-settings" style="display: none;">
-    <div class="settings-header">
-      <h3>Circle Settings</h3>
-      <button class="settings-close-btn" data-target="circleSettings"><i class="fas fa-times"></i></button>
-    </div>
+  <div id="circleSettings" class="tool-settings eraser-settings" style="display: none;">
+    <h3>Circle Settings</h3>
     <label for="circleColor">Circle Color:</label>
     <input type="color" id="circleColor" value="#000000">
     <label for="circleSize">Line Size:</label>
     <input type="range" id="circleSize" min="1" max="20" value="2" class="size-slider">
+
   </div>
 
   <!-- Add eraser cursor element -->

@@ -57,61 +57,22 @@ document.addEventListener("DOMContentLoaded", function () {
 	let lastX = 0;
 	let lastY = 0;
 
-	// State tracking variables
+	// Drawing settings
 	let currentTool = "brush";
-	let historyIndex = -1;
-	let history = [];
+	let currentColor = "#000000";
+	let currentWidth = 5; // Default brush size
 	let lastSaveTime = Date.now();
-
-	// Tool-specific settings
-	const toolColors = {
-		brush: "#000000",
-		line: "#000000",
-		rectangle: "#000000",
-		circle: "#000000",
-		text: "#000000",
-		eraser: "#ffffff"
-	};
-	
-	const toolSizes = {
+	let toolSizes = {
 		brush: 5,
 		line: 2,
 		rectangle: 2,
 		circle: 2,
-		text: 24,
-		eraser: 30
+		eraser: 30,
 	};
-	
-	// Current active settings (will be set based on selected tool)
-	let currentColor = toolColors.brush;
-	let currentWidth = toolSizes.brush;
-	
-	// Update tool-specific settings
-	function updateToolSettings() {
-		// Set current color and width based on the active tool
-		currentColor = toolColors[currentTool];
-		currentWidth = toolSizes[currentTool];
-		
-		// Update UI to reflect the current tool's settings
-		if (currentTool === "brush" && brushColorInput && brushSizeSlider) {
-			brushColorInput.value = toolColors.brush;
-			brushSizeSlider.value = toolSizes.brush;
-		} else if (currentTool === "line" && lineColorInput && lineSizeSlider) {
-			lineColorInput.value = toolColors.line;
-			lineSizeSlider.value = toolSizes.line;
-		} else if (currentTool === "rectangle" && rectangleColorInput && rectangleSizeSlider) {
-			rectangleColorInput.value = toolColors.rectangle;
-			rectangleSizeSlider.value = toolSizes.rectangle;
-		} else if (currentTool === "circle" && circleColorInput && circleSizeSlider) {
-			circleColorInput.value = toolColors.circle;
-			circleSizeSlider.value = toolSizes.circle;
-		} else if (currentTool === "text" && textColorInput && textSizeSlider) {
-			textColorInput.value = toolColors.text;
-			textSizeSlider.value = toolSizes.text;
-		} else if (currentTool === "eraser" && eraserSizeSlider) {
-			eraserSizeSlider.value = toolSizes.eraser;
-		}
-	}
+
+	// History for undo/redo
+	const history = [];
+	let historyIndex = -1;
 
 	// Resize canvas to fit window
 	function resizeCanvas() {
@@ -180,6 +141,36 @@ document.addEventListener("DOMContentLoaded", function () {
 	// Save initial blank state
 	saveState();
 
+	// Add event listener for brush size selection
+	brushSizeSelect.addEventListener("change", (e) => {
+		toolSizes.brush = parseInt(e.target.value);
+		if (currentTool === "brush") {
+			currentWidth = toolSizes.brush;
+		}
+	});
+
+	// Add event listeners for other tool sizes
+	document.getElementById("lineSize")?.addEventListener("change", (e) => {
+		toolSizes.line = parseInt(e.target.value);
+		if (currentTool === "line") {
+			currentWidth = toolSizes.line;
+		}
+	});
+
+	document.getElementById("shapeSize")?.addEventListener("change", (e) => {
+		const size = parseInt(e.target.value);
+		toolSizes.rectangle = size;
+		toolSizes.circle = size;
+		if (currentTool === "rectangle" || currentTool === "circle") {
+			currentWidth = size;
+		}
+	});
+
+	// Update currentWidth when tool changes
+	function updateToolSize() {
+		currentWidth = toolSizes[currentTool];
+	}
+
 	// Drawing functions
 	function startDrawing(e) {
 		isDrawing = true;
@@ -221,8 +212,8 @@ document.addEventListener("DOMContentLoaded", function () {
 		switch (currentTool) {
 			case "brush":
 				ctx.globalCompositeOperation = "source-over";
-				ctx.strokeStyle = toolColors.brush;
-				ctx.lineWidth = toolSizes.brush;
+				ctx.strokeStyle = currentColor;
+				ctx.lineWidth = currentWidth;
 				ctx.lineCap = "round";
 				ctx.lineJoin = "round";
 
@@ -278,8 +269,8 @@ document.addEventListener("DOMContentLoaded", function () {
 					endX: currentX,
 					endY: currentY,
 					points: window.brushPoints.map((p) => ({ x: p.x, y: p.y })),
-					color: toolColors.brush,
-					width: toolSizes.brush,
+					color: currentColor,
+					width: currentWidth,
 					timestamp: Date.now(),
 				});
 				break;
@@ -289,7 +280,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				ctx.globalCompositeOperation = "destination-out";
 				// Clear a circle at the cursor position
 				ctx.beginPath();
-				const eraserSize = toolSizes.eraser;
+				const eraserSize = parseInt(eraserSizeSelect.value);
 				// Draw a continuous line for smooth erasing
 				ctx.lineWidth = eraserSize;
 				ctx.strokeStyle = "rgba(255,255,255,1)"; // Color doesn't matter with destination-out
@@ -325,9 +316,8 @@ document.addEventListener("DOMContentLoaded", function () {
 				if (historyIndex >= 0) {
 					ctx.drawImage(history[historyIndex], 0, 0);
 				}
-				ctx.globalCompositeOperation = "source-over";
-				ctx.strokeStyle = toolColors.line;
-				ctx.lineWidth = toolSizes.line;
+				ctx.strokeStyle = currentColor;
+				ctx.lineWidth = currentWidth;
 				ctx.fillStyle = "transparent";
 				ctx.beginPath();
 				ctx.moveTo(lastX, lastY);
@@ -340,9 +330,8 @@ document.addEventListener("DOMContentLoaded", function () {
 				if (historyIndex >= 0) {
 					ctx.drawImage(history[historyIndex], 0, 0);
 				}
-				ctx.globalCompositeOperation = "source-over";
-				ctx.strokeStyle = toolColors.rectangle;
-				ctx.lineWidth = toolSizes.rectangle;
+				ctx.strokeStyle = currentColor;
+				ctx.lineWidth = currentWidth;
 				ctx.fillStyle = "transparent";
 				ctx.beginPath();
 				const width = currentX - lastX;
@@ -356,9 +345,8 @@ document.addEventListener("DOMContentLoaded", function () {
 				if (historyIndex >= 0) {
 					ctx.drawImage(history[historyIndex], 0, 0);
 				}
-				ctx.globalCompositeOperation = "source-over";
-				ctx.strokeStyle = toolColors.circle;
-				ctx.lineWidth = toolSizes.circle;
+				ctx.strokeStyle = currentColor;
+				ctx.lineWidth = currentWidth;
 				ctx.fillStyle = "transparent";
 				ctx.beginPath();
 				const radius = Math.sqrt(Math.pow(currentX - lastX, 2) + Math.pow(currentY - lastY, 2));
@@ -382,57 +370,60 @@ document.addEventListener("DOMContentLoaded", function () {
 		ctx.globalAlpha = 1; // Reset opacity
 	}
 
-	function stopDrawing(e) {
+	function stopDrawing(event) {
 		if (!isDrawing) return;
 		isDrawing = false;
 
-		// Reset brush points
+		// Clear brush points
 		window.brushPoints = [];
 
+		// Save the current state
+		saveState();
+
+		// Get current mouse position
 		const rect = canvas.getBoundingClientRect();
-		const endX = e.clientX - rect.left;
-		const endY = e.clientY - rect.top;
+		const currentX = event.clientX - rect.left;
+		const currentY = event.clientY - rect.top;
 
-		if (currentTool === "line") {
-			socket.emit("drawEvent", {
-				tool: "line",
-				startX: lastX,
-				startY: lastY,
-				endX: endX,
-				endY: endY,
-				color: toolColors.line,
-				width: toolSizes.line,
-				timestamp: Date.now(),
-			});
-		} else if (currentTool === "rectangle") {
-			const width = endX - lastX;
-			const height = endY - lastY;
-			socket.emit("drawEvent", {
-				tool: "rectangle",
-				startX: lastX,
-				startY: lastY,
-				width: width,
-				height: height,
-				color: toolColors.rectangle,
-				lineWidth: toolSizes.rectangle,
-				timestamp: Date.now(),
-			});
-		} else if (currentTool === "circle") {
-			const radiusX = Math.abs(endX - lastX) / 2;
-			const radiusY = Math.abs(endY - lastY) / 2;
-			const centerX = Math.min(lastX, endX) + radiusX;
-			const centerY = Math.min(lastY, endY) + radiusY;
+		// Emit shape drawing events
+		if (currentTool !== "brush" && currentTool !== "pencil") {
+			switch (currentTool) {
+				case "line":
+					socket.emit("drawEvent", {
+						tool: "line",
+						startX: lastX,
+						startY: lastY,
+						endX: currentX,
+						endY: currentY,
+						color: currentColor,
+						width: currentWidth,
+					});
+					break;
 
-			socket.emit("drawEvent", {
-				tool: "circle",
-				centerX: centerX,
-				centerY: centerY,
-				radiusX: radiusX,
-				radiusY: radiusY,
-				color: toolColors.circle,
-				lineWidth: toolSizes.circle,
-				timestamp: Date.now(),
-			});
+				case "rectangle":
+					socket.emit("drawEvent", {
+						tool: "rectangle",
+						startX: lastX,
+						startY: lastY,
+						width: currentX - lastX,
+						height: currentY - lastY,
+						color: currentColor,
+						lineWidth: currentWidth, // Change width to lineWidth to avoid conflict
+					});
+					break;
+
+				case "circle":
+					const radius = Math.sqrt(Math.pow(currentX - lastX, 2) + Math.pow(currentY - lastY, 2));
+					socket.emit("drawEvent", {
+						tool: "circle",
+						centerX: lastX,
+						centerY: lastY,
+						radius: radius,
+						color: currentColor,
+						lineWidth: currentWidth, // Change width to lineWidth to avoid conflict
+					});
+					break;
+			}
 		}
 
 		// If text tool is selected, prompt for text input
@@ -707,9 +698,12 @@ document.addEventListener("DOMContentLoaded", function () {
 	const brushSettingsPopup = document.getElementById("brushSettings");
 	const brushColorInput = document.getElementById("brushColor");
 	const brushSizeSlider = document.getElementById("brushSizeSlider");
+	// const brushOpacitySlider = document.getElementById("brushOpacity");
 	const eraserSettings = document.getElementById("eraserSettings");
 	const eraserBtn = document.getElementById("eraserBtn");
+	// const eraserCursor = document.getElementById("eraserCursor");
 	const eraserSizeSlider = document.getElementById("eraserSize");
+	// const eraserSizeControl = document.getElementById("eraserSizeControl");
 	const textSettings = document.getElementById("textSettings");
 	const textColorInput = document.getElementById("textColor");
 	const textSizeSlider = document.getElementById("textSize");
@@ -728,19 +722,13 @@ document.addEventListener("DOMContentLoaded", function () {
 	// Update text settings
 	if (textColorInput) {
 		textColorInput.addEventListener("input", (e) => {
-			toolColors.text = e.target.value;
-			if (currentTool === "text") {
-				currentColor = e.target.value;
-			}
+			currentColor = e.target.value;
 		});
 	}
 
 	if (textSizeSlider) {
 		textSizeSlider.addEventListener("input", (e) => {
-			toolSizes.text = parseInt(e.target.value);
-			if (currentTool === "text") {
-				currentWidth = parseInt(e.target.value);
-			}
+			currentWidth = parseInt(e.target.value);
 		});
 	}
 
@@ -748,11 +736,6 @@ document.addEventListener("DOMContentLoaded", function () {
 	if (eraserSizeSlider) {
 		eraserSizeSlider.addEventListener("input", (e) => {
 			const size = parseInt(e.target.value);
-			toolSizes.eraser = size;
-			if (currentTool === "eraser") {
-				currentWidth = size;
-			}
-			
 			const eraserCursor = document.getElementById("eraserCursor");
 			if (eraserCursor) {
 				eraserCursor.style.width = `${size}px`;
@@ -761,126 +744,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			}
 		});
 	}
-	
-	// Brush settings
-	if (brushColorInput) {
-		brushColorInput.addEventListener("input", (e) => {
-			toolColors.brush = e.target.value;
-			if (currentTool === "brush") {
-				currentColor = e.target.value;
-			}
-		});
-	}
-	
-	if (brushSizeSlider) {
-		brushSizeSlider.addEventListener("input", (e) => {
-			toolSizes.brush = parseInt(e.target.value);
-			if (currentTool === "brush") {
-				currentWidth = parseInt(e.target.value);
-			}
-		});
-	}
-	
-	// Line settings
-	if (lineColorInput) {
-		lineColorInput.addEventListener("input", (e) => {
-			toolColors.line = e.target.value;
-			if (currentTool === "line") {
-				currentColor = e.target.value;
-			}
-		});
-	}
-	
-	if (lineSizeSlider) {
-		lineSizeSlider.addEventListener("input", (e) => {
-			toolSizes.line = parseInt(e.target.value);
-			if (currentTool === "line") {
-				currentWidth = parseInt(e.target.value);
-			}
-		});
-	}
-	
-	// Rectangle settings
-	if (rectangleColorInput) {
-		rectangleColorInput.addEventListener("input", (e) => {
-			toolColors.rectangle = e.target.value;
-			if (currentTool === "rectangle") {
-				currentColor = e.target.value;
-			}
-		});
-	}
-	
-	if (rectangleSizeSlider) {
-		rectangleSizeSlider.addEventListener("input", (e) => {
-			toolSizes.rectangle = parseInt(e.target.value);
-			if (currentTool === "rectangle") {
-				currentWidth = parseInt(e.target.value);
-			}
-		});
-	}
-	
-	// Circle settings
-	if (circleColorInput) {
-		circleColorInput.addEventListener("input", (e) => {
-			toolColors.circle = e.target.value;
-			if (currentTool === "circle") {
-				currentColor = e.target.value;
-			}
-		});
-	}
-	
-	if (circleSizeSlider) {
-		circleSizeSlider.addEventListener("input", (e) => {
-			toolSizes.circle = parseInt(e.target.value);
-			if (currentTool === "circle") {
-				currentWidth = parseInt(e.target.value);
-			}
-		});
-	}
 
-	// Setup close buttons for tool settings panels
-	document.addEventListener('DOMContentLoaded', () => {
-		document.querySelectorAll('.settings-close-btn').forEach(btn => {
-			btn.addEventListener('click', function() {
-				const targetId = this.getAttribute('data-target');
-				const panel = document.getElementById(targetId);
-				if (panel) {
-					panel.style.display = 'none';
-				}
-			});
-		});
-	});
-
-	// Color picker
-	const colorPicker = document.getElementById("colorPicker");
-	if (colorPicker) {
-		colorPicker.addEventListener("input", (e) => {
-			// Update the current tool color
-			toolColors[currentTool] = e.target.value;
-			currentColor = e.target.value;
-			
-			// Also update the corresponding tool-specific color input
-			if (currentTool === "brush" && brushColorInput) {
-				brushColorInput.value = e.target.value;
-			} else if (currentTool === "line" && lineColorInput) {
-				lineColorInput.value = e.target.value;
-			} else if (currentTool === "rectangle" && rectangleColorInput) {
-				rectangleColorInput.value = e.target.value;
-			} else if (currentTool === "circle" && circleColorInput) {
-				circleColorInput.value = e.target.value;
-			} else if (currentTool === "text" && textColorInput) {
-				textColorInput.value = e.target.value;
-			}
-		});
-		
-		colorPicker.addEventListener("change", (e) => {
-			// Update the current tool color
-			toolColors[currentTool] = e.target.value;
-			currentColor = e.target.value;
-		});
-	}
-
-	// Tool selection
 	toolButtons.forEach((button) => {
 		button.addEventListener("click", () => {
 			// Remove active class from all tool buttons
@@ -891,10 +755,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 			// Set current tool
 			currentTool = button.dataset.tool;
-			
-			// Update current settings based on the selected tool
-			currentColor = toolColors[currentTool];
-			currentWidth = toolSizes[currentTool];
+			updateToolSize();
 
 			// Update canvas class to indicate eraser is active or not
 			if (currentTool === "eraser") {
@@ -904,9 +765,12 @@ document.addEventListener("DOMContentLoaded", function () {
 			}
 
 			// Hide all settings panels first
-			document.querySelectorAll(".tool-settings").forEach(panel => {
-				panel.style.display = "none";
-			});
+			brushSettingsPopup.style.display = "none";
+			eraserSettings.style.display = "none";
+			textSettings.style.display = "none";
+			lineSettings.style.display = "none";
+			rectangleSettings.style.display = "none";
+			circleSettings.style.display = "none";
 
 			// Explicitly hide eraser cursor when switching tools
 			const eraserCursor = document.getElementById("eraserCursor");
@@ -925,10 +789,25 @@ document.addEventListener("DOMContentLoaded", function () {
 			}
 
 			// Show settings for selected tool
-			const settingsPanelId = `${currentTool}Settings`;
-			const settingsPanel = document.getElementById(settingsPanelId);
-			if (settingsPanel) {
-				settingsPanel.style.display = "block";
+			switch (currentTool) {
+				case "brush":
+					brushSettingsPopup.style.display = "block";
+					break;
+				case "eraser":
+					eraserSettings.style.display = "block";
+					break;
+				case "text":
+					textSettings.style.display = "block";
+					break;
+				case "line":
+					lineSettings.style.display = "block";
+					break;
+				case "rectangle":
+					rectangleSettings.style.display = "block";
+					break;
+				case "circle":
+					circleSettings.style.display = "block";
+					break;
 			}
 
 			if (currentTool === "eraser") {
@@ -937,13 +816,9 @@ document.addEventListener("DOMContentLoaded", function () {
 					tool.classList.remove("active");
 				});
 
-				const eraserSettings = document.getElementById("eraserSettings");
-				if (eraserSettings) {
-					eraserSettings.style.display = "block";
-				}
-				
-				const eraserSize = toolSizes.eraser;
-				const cursorSize = Math.max(10, eraserSize); // Minimum size of 10px
+				eraserSettings.style.display = "block";
+				const eraserSize = parseInt(eraserSizeSlider.value);
+				const cursorSize = Math.max(10, eraserSize * 0.5); // Minimum size of 10px
 				canvas.style.cursor = `none`;
 				if (eraserCursor) {
 					eraserCursor.style.display = "block";
@@ -967,6 +842,1176 @@ document.addEventListener("DOMContentLoaded", function () {
 	window.lastMouseEvent = null;
 	document.addEventListener("mousemove", (e) => {
 		window.lastMouseEvent = e;
+	});
+
+	// Color picker
+	const colorPicker = document.getElementById("colorPicker");
+	colorPicker.addEventListener("input", (e) => {
+		currentColor = e.target.value;
+		ctx.strokeStyle = currentColor; // Immediately update the strokeStyle
+	});
+
+	// Update line color
+	lineColorInput.addEventListener("input", (e) => {
+		currentColor = e.target.value;
+	});
+	
+	// Update rectangle color
+	rectangleColorInput.addEventListener("input", (e) => {
+		currentColor = e.target.value;
+	});
+
+	// Update circle color
+	circleColorInput.addEventListener("input", (e) => {
+		currentColor = e.target.value;
+	});	
+	
+
+	// Add color picker change event for completion
+	colorPicker.addEventListener("change", (e) => {
+		currentColor = e.target.value;
+		ctx.strokeStyle = currentColor;
+	});
+
+	// Stroke width
+	const strokeButtons = document.querySelectorAll(".stroke-btn");
+	strokeButtons.forEach((button) => {
+		button.addEventListener("click", () => {
+			// Remove active class from all stroke buttons
+			strokeButtons.forEach((btn) => btn.classList.remove("active"));
+
+			// Add active class to clicked button
+			button.classList.add("active");
+
+			// Set current width
+			currentWidth = parseInt(button.dataset.width);
+		});
+	});
+
+	// Undo button
+	document.getElementById("undoBtn").addEventListener("click", () => {
+		if (historyIndex > 0) {
+			historyIndex--;
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
+			ctx.drawImage(history[historyIndex], 0, 0);
+
+			// Update button states
+			document.getElementById("undoBtn").disabled = historyIndex <= 0;
+			document.getElementById("redoBtn").disabled = false;
+		}
+	});
+
+	// Redo button
+	document.getElementById("redoBtn").addEventListener("click", () => {
+		if (historyIndex < history.length - 1) {
+			historyIndex++;
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
+			ctx.drawImage(history[historyIndex], 0, 0);
+
+			// Update button states
+			document.getElementById("redoBtn").disabled = historyIndex >= history.length - 1;
+			document.getElementById("undoBtn").disabled = false;
+		}
+	});
+
+	// Clear button
+	document.getElementById("clearBtn").addEventListener("click", () => {
+		if (confirm("Are you sure you want to clear the entire board?")) {
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
+			saveState();
+
+			// Emit clear event
+			socket.emit("clearCanvas");
+		}
+	});
+
+	// Share button and modal
+	const shareModal = document.getElementById("shareModal");
+	const shareBtn = document.getElementById("shareBtn");
+	const closeBtn = document.querySelector(".close-btn");
+	const closeBtn2 = document.querySelector(".close-btn2");
+	const shareLink = document.getElementById("shareLink");
+	const copyLinkBtn = document.getElementById("copyLinkBtn");
+
+	// Initially hide the share button until we confirm ownership
+	if (shareBtn) {
+		shareBtn.style.display = "none"; // Default to hiding it
+	}
+	
+	// Initially hide the invite button until we confirm ownership
+	const inviteUserBtn = document.getElementById("inviteUser");
+	if (inviteUserBtn) {
+		inviteUserBtn.style.display = "none"; // Default to hiding it
+	}
+
+	// Handle user rights
+	let isOwner = false;
+	socket.on("userRights", ({ isOwner: ownerStatus }) => {
+		console.log("userRights event received with ownerStatus:", ownerStatus);
+		isOwner = ownerStatus === true; // Force boolean conversion
+		// Show/hide share button based on ownership
+		const shareBtn = document.getElementById("shareBtn");
+		const inviteUserBtn = document.getElementById("inviteUser");
+		
+		// Make sure both buttons exist before trying to modify them
+		if (shareBtn && inviteUserBtn) {
+			// Make sure the share button is visible for owners
+			if (isOwner === true) {
+				console.log("isOwner is true - showing share and invite buttons");
+				shareBtn.style.display = "block";
+				inviteUserBtn.style.display = "block";
+			} else {
+				console.log("isOwner is false - hiding share and invite buttons");
+				shareBtn.style.display = "none";
+				inviteUserBtn.style.display = "none";
+			}
+		} else {
+			console.error("Share or invite buttons not found in the DOM");
+		}
+		
+		console.log(`User rights updated - isOwner: ${isOwner}`);
+	});
+	
+	// Set up explicit share button handler with event delegation (more reliable)
+	document.addEventListener('click', function(e) {
+		// Check if the clicked element is the share button or a child of it
+		if (e.target.id === 'shareBtn' || e.target.closest('#shareBtn')) {
+			e.preventDefault();
+			e.stopPropagation();
+			console.log("Share button clicked via delegation");
+			
+			// Set the share link
+			if (shareLink) {
+				shareLink.value = window.location.href;
+				console.log("Share link set to:", window.location.href);
+			}
+			
+			// Generate and display a 6-digit code
+			const boardCodeElement = document.getElementById("boardCode");
+			if (boardCodeElement) {
+				const sixDigitCode = generateSixDigitCode(roomId);
+				boardCodeElement.textContent = sixDigitCode;
+				console.log("Board code generated:", sixDigitCode);
+			}
+			
+			// Show the modal - ensure it's visible
+			if (shareModal) {
+				shareModal.style.removeProperty('display'); // Remove any inline display style
+				shareModal.classList.add("active");
+				console.log("Share modal opened via delegation");
+				
+				// Force repaint to ensure smooth animation
+				setTimeout(() => {
+					shareModal.style.opacity = "1";
+					shareModal.style.visibility = "visible";
+				}, 10);
+			} else {
+				console.error("Share modal element not found");
+			}
+		}
+	});
+
+	// Ensure close buttons work properly
+	if (closeBtn) {
+		closeBtn.addEventListener("click", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			shareModal.classList.remove("active");
+			
+			// Add delay before hiding to allow animation to complete
+			setTimeout(() => {
+				shareModal.style.display = "none";
+			}, 300);
+		});
+	}
+
+	if (closeBtn2) {
+		closeBtn2.addEventListener("click", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			shareModal.classList.remove("active");
+			
+			// Add delay before hiding to allow animation to complete
+			setTimeout(() => {
+				shareModal.style.display = "none";
+			}, 300);
+		});
+	}
+
+	// Close modal when clicking outside
+	window.addEventListener("click", (e) => {
+		if (e.target === shareModal) {
+			shareModal.classList.remove("active");
+			
+			// Add delay before hiding to allow animation to complete
+			setTimeout(() => {
+				shareModal.style.display = "none";
+			}, 300);
+		}
+	});
+
+	// Copy link button
+	copyLinkBtn.addEventListener("click", () => {
+		shareLink.select();
+		document.execCommand("copy");
+
+		// Show toast notification
+		showToast("Link copied to clipboard!");
+	});
+
+	// Add a new copy button for the board code
+	const copyCodeBtn = document.getElementById("copyCodeBtn");
+	if (copyCodeBtn) {
+		copyCodeBtn.addEventListener("click", () => {
+			const boardCode = document.getElementById("boardCode").textContent;
+			navigator.clipboard
+				.writeText(boardCode)
+				.then(() => {
+					showToast("Board code copied to clipboard!");
+				})
+				.catch((err) => {
+					console.error("Could not copy board code: ", err);
+					// Fallback method
+					const tempInput = document.createElement("input");
+					tempInput.value = boardCode;
+					document.body.appendChild(tempInput);
+					tempInput.select();
+					document.execCommand("copy");
+					document.body.removeChild(tempInput);
+					showToast("Board code copied to clipboard!");
+				});
+		});
+	}
+
+	// Password protection toggle
+	const enablePasswordCheckbox = document.getElementById("enablePassword");
+	const passwordInput = document.querySelector(".password-input");
+
+	// Check if room already has password protection
+	socket.on("roomPasswordStatus", (hasPassword) => {
+		enablePasswordCheckbox.checked = hasPassword;
+		passwordInput.style.display = hasPassword ? "flex" : "none";
+	});
+
+	enablePasswordCheckbox.addEventListener("change", () => {
+		passwordInput.style.display = enablePasswordCheckbox.checked ? "flex" : "none";
+
+		// If checkbox is unchecked, remove password protection
+		if (!enablePasswordCheckbox.checked) {
+			socket.emit("removeRoomPassword", { roomId });
+			showToast("Password protection removed");
+		}
+	});
+
+	// Set password button
+	document.getElementById("setPasswordBtn").addEventListener("click", () => {
+		const passwordField = document.getElementById("boardPassword");
+		const password = passwordField.value;
+		if (password) {
+			socket.emit("setRoomPassword", { roomId, password });
+			showToast("Password protection enabled");
+			shareModal.classList.remove("active");
+		} else {
+			alert("Please enter a password");
+		}
+	});
+
+	// Add password visibility toggle
+	const togglePasswordBtn = document.createElement("button");
+	togglePasswordBtn.type = "button";
+	togglePasswordBtn.className = "btn password-toggle";
+	togglePasswordBtn.innerHTML = '<i class="fas fa-eye"></i>';
+	togglePasswordBtn.title = "Show/Hide Password";
+	togglePasswordBtn.addEventListener("click", () => {
+		const passwordField = document.getElementById("boardPassword");
+		if (passwordField.type === "password") {
+			passwordField.type = "text";
+			togglePasswordBtn.innerHTML = '<i class="fas fa-eye-slash"></i>';
+		} else {
+			passwordField.type = "password";
+			togglePasswordBtn.innerHTML = '<i class="fas fa-eye"></i>';
+		}
+	});
+
+	// Insert toggle button after password input
+	const passwordInputContainer = document.querySelector(".password-input");
+	passwordInputContainer.insertBefore(togglePasswordBtn, document.getElementById("setPasswordBtn"));
+
+	// Save button
+	document.getElementById("saveBtn").addEventListener("click", () => {
+		// Create a temporary link element
+		const link = document.createElement("a");
+		link.download = roomName + ".png";
+		link.href = canvas.toDataURL("image/png");
+
+		// Trigger download
+		document.body.appendChild(link);
+		link.click();
+		document.body.removeChild(link);
+
+		showToast("Board saved as PNG");
+	});
+
+	// Toast notification
+	function showToast(message, type = "info") {
+		const toast = document.getElementById("toast");
+		const toastMessage = document.getElementById("toastMessage");
+
+		toastMessage.textContent = message;
+		toast.className = "toast " + type;
+		toast.classList.add("active");
+
+		// Hide toast after 3 seconds
+		setTimeout(() => {
+			toast.classList.remove("active");
+		}, 3000);
+	}
+
+	// Get user info from localStorage
+	function getUserInfo() {
+		try {
+			const userJson = localStorage.getItem("user");
+			if (userJson) {
+				return JSON.parse(userJson);
+			}
+		} catch (e) {
+			console.error("Error parsing user data:", e);
+		}
+		return null;
+	}
+
+	// User name prompt
+	function promptForUserName() {
+		// First try to get name from logged in user
+		const user = getUserInfo();
+		if (user && user.name) {
+			return user.name;
+		}
+
+		// Otherwise check localStorage or prompt
+		let userName = localStorage.getItem("collaboard_username");
+
+		if (!userName) {
+			userName = prompt(
+				"Enter your name to join the whiteboard:",
+				"Guest " + Math.floor(Math.random() * 1000)
+			);
+			if (!userName) userName = "Guest " + Math.floor(Math.random() * 1000);
+			localStorage.setItem("collaboard_username", userName);
+		}
+
+		return userName;
+	}
+
+	// Create password verification modal
+	const passwordModal = document.createElement("div");
+	passwordModal.className = "modal";
+	passwordModal.id = "passwordModal";
+	passwordModal.innerHTML = `
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3><i class="fas fa-lock"></i> Password Required</h3>
+      </div>
+      <div class="modal-body">
+        <p>This board is password protected. Please enter the password to join.</p>
+        <div class="password-input" style="display: flex;">
+          <input type="password" id="joinPassword" placeholder="Enter password">
+          <button id="toggleJoinPassword" class="btn password-toggle">
+            <i class="fas fa-eye"></i>
+          </button>
+          <button class="btn btn-primary" id="submitPasswordBtn">Join</button>
+        </div>
+        <div id="passwordError" class="error-message" style="display: none; margin-top: 40px;"></div>
+      </div>
+    </div>
+  `;
+	document.body.appendChild(passwordModal);
+
+	// Add password toggle functionality
+	document.getElementById("toggleJoinPassword").addEventListener("click", () => {
+		const passwordField = document.getElementById("joinPassword");
+		const toggleBtn = document.getElementById("toggleJoinPassword");
+
+		if (passwordField.type === "password") {
+			passwordField.type = "text";
+			toggleBtn.innerHTML = '<i class="fas fa-eye-slash"></i>';
+		} else {
+			passwordField.type = "password";
+			toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
+		}
+	});
+
+	// Submit password button
+	document.getElementById("submitPasswordBtn").addEventListener("click", submitPassword);
+
+	// Submit password on enter key
+	document.getElementById("joinPassword").addEventListener("keyup", (e) => {
+		if (e.key === "Enter") {
+			submitPassword();
+		}
+	});
+
+	function submitPassword() {
+		const password = document.getElementById("joinPassword").value;
+		const errorElement = document.getElementById("passwordError");
+
+		if (!password) {
+			errorElement.textContent = "Please enter a password";
+			errorElement.style.display = "block";
+			errorElement.style.opacity = "1";
+			return;
+		}
+
+		errorElement.style.display = "none";
+		socket.emit("checkRoomPassword", { roomId, password });
+	}
+
+	// Handle password check result
+	socket.on("passwordCheckResult", ({ success, message }) => {
+		if (success) {
+			passwordModal.classList.remove("active");
+			const user = getUserInfo();
+			const userId = user ? user.id : null;
+
+			// Store both room auth and user ID if available
+			localStorage.setItem(`board_auth_${roomId}`, "true");
+			if (userId) {
+				localStorage.setItem(`board_user_${roomId}`, userId);
+			}
+
+			socket.emit("joinRoom", {
+				roomId,
+				userName: promptForUserName(),
+				userId,
+				hasLocalAuth: true, // Always true after successful auth
+			});
+		} else {
+			const errorElement = document.getElementById("passwordError");
+			errorElement.textContent = message || "Incorrect password";
+			errorElement.style.display = "block";
+			errorElement.style.opacity = "1";
+		}
+	});
+
+	// Handle password required
+	socket.on("passwordRequired", () => {
+		passwordModal.classList.add("active");
+	});
+
+	// Also listen for roomData event to ensure we get ownership status
+	socket.on("roomData", (data) => {
+		console.log("roomData received, sending userReady event");
+		// Immediately send userReady event to get ownership status
+		setTimeout(() => {
+			socket.emit("userReady", { roomId });
+			console.log("userReady event sent after roomData received");
+			
+			// Also explicitly check ownership as a backup mechanism
+			setTimeout(() => {
+				console.log("Explicitly checking ownership status");
+				socket.emit("checkOwnership", { roomId });
+			}, 1000);
+		}, 500);
+	});
+
+	// Make inviteUser button open the share modal
+	if (inviteUserBtn) {
+		inviteUserBtn.addEventListener("click", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			console.log("Invite button clicked - opening share modal");
+			
+			// Set the share link
+			if (shareLink) {
+				shareLink.value = window.location.href;
+				console.log("Share link set to:", window.location.href);
+			}
+
+			// Generate and display a 6-digit code
+			const boardCodeElement = document.getElementById("boardCode");
+			if (boardCodeElement) {
+				const sixDigitCode = generateSixDigitCode(roomId);
+				boardCodeElement.textContent = sixDigitCode;
+				console.log("Board code generated for invite:", sixDigitCode);
+			}
+
+			// Show the modal - ensure it's visible
+			if (shareModal) {
+				shareModal.style.removeProperty('display'); // Remove any inline display style
+				shareModal.classList.add("active");
+				console.log("Share modal opened from invite button");
+				
+				// Force repaint to ensure smooth animation
+				setTimeout(() => {
+					shareModal.style.opacity = "1";
+					shareModal.style.visibility = "visible";
+				}, 10);
+			} else {
+				console.error("Share modal element not found for invite button");
+			}
+		});
+	}
+
+	// Join room
+	const hasLocalAuth = localStorage.getItem(`board_auth_${roomId}`) === "true";
+	const storedUserId = localStorage.getItem(`board_user_${roomId}`);
+	const user = getUserInfo();
+
+	// Join room with auth check
+	(async () => {
+		const token = localStorage.getItem("token");
+		if (token) {
+			try {
+				const response = await fetch("/api/user", {
+					headers: {
+						Authorization: `Bearer ${token}`,
+					},
+				});
+
+				if (response.ok) {
+					// Now join the room with authenticated user
+					socket.emit("joinRoom", {
+						roomId,
+						userName: promptForUserName(),
+						userId: storedUserId || (user ? user.id : null),
+						hasLocalAuth,
+						token,
+					});
+					
+					// Explicitly notify server that user is ready to receive rights info
+					setTimeout(() => {
+						socket.emit("userReady", { roomId });
+						
+						// Double check ownership after a delay
+						setTimeout(() => {
+							console.log("Explicitly checking ownership after joining room");
+							socket.emit("checkOwnership", { roomId });
+						}, 1500);
+					}, 1000);
+				} else {
+					// Token invalid, join as guest
+					socket.emit("joinRoom", {
+						roomId,
+						userName: promptForUserName(),
+						hasLocalAuth,
+					});
+				}
+			} catch (error) {
+				console.error("Auth check error:", error);
+				// Join as guest on error
+				socket.emit("joinRoom", {
+					roomId,
+					userName: promptForUserName(),
+					hasLocalAuth,
+				});
+			}
+		} else {
+			// No token, join as guest
+			socket.emit("joinRoom", {
+				roomId,
+				userName: promptForUserName(),
+				hasLocalAuth,
+			});
+		}
+	})();
+
+	// Handle room data (users and history)
+	socket.on("roomData", ({ users, history: roomHistory }) => {
+		console.log(
+			"Received room data with",
+			users.length,
+			"users and",
+			roomHistory ? roomHistory.length : 0,
+			"history items"
+		);
+
+		// Update users list
+		updateUsersList(users);
+
+		// Apply drawing history if available
+		if (roomHistory && roomHistory.length > 0) {
+			// Clear canvas first to ensure we start fresh
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
+			console.log("Applying board history...");
+
+			// Sort history by timestamp if available to ensure correct order
+			if (roomHistory[0].timestamp) {
+				roomHistory.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+			}
+
+			// First pass: process all non-eraser events
+			const eraserEvents = [];
+
+			// Process in batches to improve performance
+			let processedCount = 0;
+			const totalEvents = roomHistory.length;
+
+			roomHistory.forEach((data) => {
+				processedCount++;
+
+				// Log progress for large histories
+				if (totalEvents > 100 && processedCount % 50 === 0) {
+					console.log(`Processing history: ${processedCount}/${totalEvents} events`);
+				}
+
+				if (data.tool === "eraser") {
+					eraserEvents.push(data);
+					return; // Skip eraser events in the first pass
+				}
+
+				// Reset context state
+				ctx.globalCompositeOperation = "source-over";
+				ctx.fillStyle = "transparent";
+				ctx.strokeStyle = data.color || "#000000";
+				ctx.lineWidth = data.width || data.lineWidth || 5;
+				ctx.lineCap = "round";
+				ctx.lineJoin = "round";
+				ctx.globalAlpha = data.opacity !== undefined ? data.opacity : 1.0;
+
+				// Handle different tools
+				switch (data.tool) {
+					case "brush":
+						ctx.beginPath();
+						ctx.moveTo(data.startX, data.startY);
+						ctx.lineTo(data.endX, data.endY);
+						ctx.stroke();
+						break;
+
+					case "line":
+						ctx.strokeStyle = data.color || "#000000";
+						ctx.lineWidth = data.lineWidth || data.width || 5;
+						ctx.fillStyle = "transparent";
+						ctx.beginPath();
+						ctx.moveTo(data.startX, data.startY);
+						ctx.lineTo(data.endX, data.endY);
+						ctx.stroke();
+						break;
+
+					case "rectangle":
+						ctx.strokeStyle = data.color || "#000000";
+						ctx.lineWidth = data.lineWidth || data.width || 5;
+						ctx.fillStyle = "transparent";
+						ctx.beginPath();
+						ctx.rect(data.startX, data.startY, data.width, data.height);
+						ctx.stroke();
+						break;
+
+					case "circle":
+						ctx.strokeStyle = data.color || "#000000";
+						ctx.lineWidth = data.lineWidth || data.width || 5;
+						ctx.fillStyle = "transparent";
+						ctx.beginPath();
+						ctx.arc(data.centerX, data.centerY, data.radius, 0, Math.PI * 2);
+						ctx.stroke();
+						break;
+
+					case "text":
+						ctx.font = `${data.fontSize}px Arial`;
+						ctx.fillStyle = data.color || "#000000";
+						ctx.fillText(data.text, data.x, data.y);
+						break;
+				}
+
+				// Reset for next drawing
+				ctx.globalAlpha = 1.0;
+				ctx.globalCompositeOperation = "source-over";
+			});
+
+			// Second pass: apply eraser events
+			if (eraserEvents.length > 0) {
+				console.log(`Applying ${eraserEvents.length} eraser events`);
+				eraserEvents.forEach((data) => {
+					ctx.globalCompositeOperation = "destination-out";
+
+					// Handle eraser with both line and spot erasing
+					if (
+						data.startX !== undefined &&
+						data.startY !== undefined &&
+						data.endX !== undefined &&
+						data.endY !== undefined
+					) {
+						// Line erasing for continuous motion
+						ctx.lineWidth = data.width;
+						ctx.strokeStyle = "rgba(255,255,255,1)"; // Color doesn't matter with destination-out
+						ctx.beginPath();
+						ctx.moveTo(data.startX, data.startY);
+						ctx.lineTo(data.endX, data.endY);
+						ctx.stroke();
+					}
+
+					// Spot erasing with a circle
+					ctx.beginPath();
+					const eraserX = data.endX || data.startX;
+					const eraserY = data.endY || data.startY;
+					ctx.arc(eraserX, eraserY, data.width / 2, 0, Math.PI * 2, false);
+					ctx.fill();
+
+					ctx.globalCompositeOperation = "source-over";
+				});
+			}
+
+			// Save the fully applied history as a state
+			console.log("History applied, saving state");
+			saveState();
+			connectionStatus.classList.remove("disconnected");
+			connectionStatus.classList.add("connected");
+			showToast("Board loaded successfully", "success");
+		}
+
+		// Now that we have all data, send the userReady event
+		socket.emit("userReady", { roomId });
+
+		// Update document title
+		document.getElementById("pageTitle").textContent = roomName;
+
+		// Update connection UI
+		connectionStatus.innerHTML = '<i class="fas fa-circle connected"></i> Connected';
+	});
+
+	// Handle user joined
+	socket.on("userJoined", (userData) => {
+		console.log("User joined:", userData);
+
+		if (userData.id === socket.id) {
+			currentUserId = userData.id;
+		}
+
+		// Add user to list
+		addUserToList(userData);
+
+		// Show notification
+		if (userData.id !== socket.id) {
+			showToast(`${userData.name} joined the board`);
+		}
+	});
+
+	// Handle user left
+	socket.on("userLeft", (user) => {
+		// Check if user is null or undefined before trying to access properties
+		if (!user) {
+			console.warn("Received null or undefined user in userLeft event");
+			return;
+		}
+
+		// Check if user is an object or just an ID
+		if (typeof user === "object") {
+			removeUserFromList(user.id);
+			// Only show toast if we have a name
+			if (user.name) {
+				showToast(`${user.name} left the board`, "info");
+			} else {
+				showToast("A user left the board", "info");
+			}
+		} else {
+			// Backward compatibility for older version
+			removeUserFromList(user);
+			showToast(`A user left the board`, "info");
+		}
+	});
+
+	// Handle user count update
+	socket.on("userCount", (count) => {
+		console.log("User count updated:", count);
+		document.getElementById("usersCount").textContent = `${count} user${count !== 1 ? "s" : ""}`;
+	});
+
+	// Update connection status
+	socket.on("connect", () => {
+		connectionStatus.classList.remove("disconnected");
+		connectionStatus.classList.add("connected");
+		console.log("Connected to server with socket ID:", socket.id);
+
+		// Get the user name before joining the room
+		const userName = promptForUserName();
+		const user = getUserInfo();
+		const userId = user ? user.id : null;
+
+		// Check if we have local authentication for this room
+		const hasLocalAuth = localStorage.getItem(`board_auth_${roomId}`) === "true";
+		const storedUserId = localStorage.getItem(`board_user_${roomId}`);
+
+		// Emit joinRoom with the user name
+		socket.emit("joinRoom", {
+			roomId,
+			userName, // Use the retrieved user name
+			userId,
+			password: null,
+			hasLocalAuth: hasLocalAuth || (userId && storedUserId === userId),
+		});
+		
+		// After joining, send userReady to get user rights
+		setTimeout(() => {
+			socket.emit("userReady", { roomId });
+			console.log("Sent userReady event to get user rights");
+		}, 1000);
+	});
+
+	socket.on("disconnect", () => {
+		console.log("Disconnected from server");
+
+		const connectionStatus = document.getElementById("connectionStatus");
+		connectionStatus.innerHTML = '<i class="fas fa-circle disconnected"></i> Disconnected';
+		connectionStatus.classList.remove("connected");
+		connectionStatus.classList.add("disconnected");
+
+		showToast("Disconnected from server. Trying to reconnect...");
+	});
+
+	// Add this new event handler for reconnect
+	socket.on("reconnect", () => {
+		console.log("Reconnected to server");
+
+		const connectionStatus = document.getElementById("connectionStatus");
+		connectionStatus.innerHTML = '<i class="fas fa-circle connected"></i> Connected';
+		connectionStatus.classList.remove("disconnected");
+		connectionStatus.classList.add("connected");
+
+		showToast("Reconnected to server", "success");
+	});
+
+	// Add this error handling code near the socket events
+	socket.on("error", ({ message }) => {
+		showToast(`Error: ${message}`, "error");
+		console.error("Server reported an error:", message);
+	});
+
+	// Users list functions
+	function updateUsersList(users) {
+		console.log("Updating users list with", users.length, "users");
+
+		const usersList = document.getElementById("usersList");
+		const existingUsers = new Set();
+
+		// First, mark all existing users for potential removal
+		Array.from(usersList.children).forEach((item) => {
+			item.dataset.keep = "false";
+		});
+
+		// Process all users in the new list
+		users.forEach((user) => {
+			// Check if this user is already in the list by userId (more stable than socket ID)
+			let existingItem = null;
+			if (user.userId) {
+				existingItem = Array.from(usersList.children).find(
+					(item) => item.dataset.userId === user.userId
+				);
+			}
+
+			if (!existingItem) {
+				// No match by userId, try by socket id
+				existingItem = document.getElementById(`user-${user.id}`);
+			}
+
+			if (existingItem) {
+				// User exists, update and keep
+				existingItem.dataset.keep = "true";
+
+				// Update name or other properties if needed
+				const nameElement = existingItem.querySelector(".user-name");
+				if (nameElement) {
+					const isCurrentUser = user.id === socket.id;
+					nameElement.textContent = `${user.name} ${isCurrentUser ? "(You)" : ""}`;
+				}
+			} else {
+				// Add new user
+				addUserToList(user);
+			}
+
+			// Remember this user was processed
+			existingUsers.add(user.id);
+		});
+
+		// Remove any users that weren't in the updated list
+		Array.from(usersList.children).forEach((item) => {
+			if (item.dataset.keep === "false") {
+				item.remove();
+			}
+		});
+	}
+
+	function addUserToList(user) {
+		const usersList = document.getElementById("usersList");
+
+		// Skip if already in list by socket ID
+		if (document.getElementById(`user-${user.id}`)) {
+			return;
+		}
+
+		// Skip if already in list by user ID
+		if (
+			user.userId &&
+			Array.from(usersList.children).some((item) => item.dataset.userId === user.userId)
+		) {
+			return;
+		}
+
+		const userItem = document.createElement("div");
+		userItem.className = "user-item";
+		userItem.id = `user-${user.id}`;
+		userItem.dataset.userId = user.userId || user.id;
+		userItem.dataset.keep = "true"; // Mark as keeping
+
+		const isCurrentUser = user.id === socket.id;
+
+		userItem.innerHTML = `
+      <div class="user-avatar" style="background-color: ${user.color};">
+        <span>${user.initial}</span>
+      </div>
+      <div class="user-name">${user.name} ${isCurrentUser ? "(You)" : ""}</div>
+    `;
+
+		usersList.appendChild(userItem);
+	}
+
+	function removeUserFromList(userId) {
+		if (!userId) {
+			console.warn("Attempted to remove user with null/undefined ID");
+			return;
+		}
+
+		const userItem = document.getElementById(`user-${userId}`);
+		if (userItem) {
+			userItem.remove();
+		}
+	}
+
+	// Update brush color
+	brushColorInput.addEventListener("input", (e) => {
+		currentColor = e.target.value;
+	});
+
+	// Update line color
+	lineColorInput.addEventListener("input", (e) => {
+		currentColor = e.target.value;
+	});
+	
+
+	// Update rectangle color
+	rectangleColorInput.addEventListener("input", (e) => {
+		currentColor = e.target.value;
+	});
+
+	// Update circle color
+	circleColorInput.addEventListener("input", (e) => {
+		currentColor = e.target.value;
+	});	
+
+	// Update brush size
+	brushSizeSlider.addEventListener("input", (e) => {
+		currentWidth = e.target.value;
+	});
+
+	// Update line size
+	lineSizeSlider.addEventListener("input", (e) => {
+		currentWidth = e.target.value;
+	});	
+
+	// Update rectangle size
+	rectangleSizeSlider.addEventListener("input", (e) => {
+		currentWidth = e.target.value;
+	});	
+
+	// Update circle size
+	circleSizeSlider.addEventListener("input", (e) => {
+		currentWidth = e.target.value;
+	});	
+	
+	
+	
+
+	// Update brush opacity
+	// brushOpacitySlider.addEventListener("input", (e) => {
+	// 	ctx.globalAlpha = e.target.value / 100; // Convert to 0-1 range
+	// });
+
+	// Update eraser size
+	eraserSizeSelect.addEventListener("change", (e) => {
+		currentWidth = parseInt(e.target.value);
+	});
+
+	// Handle room password updates
+	socket.on("roomPasswordUpdated", (hasPassword) => {
+		// Update checkbox if user has share modal open
+		if (document.getElementById("shareModal").classList.contains("active")) {
+			enablePasswordCheckbox.checked = hasPassword;
+			passwordInput.style.display = hasPassword ? "flex" : "none";
+		}
+	});
+
+	// Add exit button handler
+	document.getElementById("exitBtn").addEventListener("click", (e) => {
+		e.preventDefault(); // Prevent default link behavior
+		e.stopPropagation();
+
+		// Show custom modal instead of default confirm
+		showExitConfirmation();
+	});
+
+	// Add this function for modern confirmation dialog
+	function showExitConfirmation() {
+		const modal = document.createElement("div");
+		modal.className = "modern-confirm-modal";
+		modal.innerHTML = `
+        <div class="modal-content">
+            <h3>Leave Board?</h3>
+            <p>Are you sure you want to leave this board?</p>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelExit">Cancel</button>
+                <button class="btn btn-danger" id="confirmExit">Leave</button>
+            </div>
+        </div>
+    `;
+		document.body.appendChild(modal);
+
+		// Handle confirm
+		document.getElementById("confirmExit").addEventListener("click", () => {
+			if (!isOwner) {
+				localStorage.removeItem(`board_auth_${roomId}`);
+				localStorage.removeItem(`board_user_${roomId}`);
+			}
+			window.location.href = "/";
+		});
+
+		// Handle cancel
+		document.getElementById("cancelExit").addEventListener("click", () => {
+			modal.remove();
+		});
+	}
+
+	// Add periodic sync to ensure all clients are up to date
+	const SYNC_INTERVAL = 30000; // 30 seconds
+
+	// Request a sync of the latest board state from the server
+	function requestBoardSync() {
+		console.log("Requesting board sync...");
+		socket.emit("requestBoardSync", { roomId });
+	}
+
+	// Setup periodic sync
+	let syncInterval;
+
+	function setupSyncInterval() {
+		// Clear any existing interval
+		if (syncInterval) {
+			clearInterval(syncInterval);
+		}
+
+		// Set up new interval
+		syncInterval = setInterval(requestBoardSync, SYNC_INTERVAL);
+		console.log("Board sync interval set up");
+	}
+
+	// Handle board sync received from server
+	socket.on("boardSync", ({ history }) => {
+		console.log(`Received board sync with ${history.length} history items`);
+
+		// Only apply if we have new history items
+		if (history && history.length > 0) {
+			// Clear canvas and apply the updated history
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+			// Sort history by timestamp if available to ensure correct order
+			if (history[0].timestamp) {
+				history.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+			}
+
+			// Process history (simplified from roomData handler)
+			const eraserEvents = [];
+
+			history.forEach((data) => {
+				if (data.tool === "eraser") {
+					eraserEvents.push(data);
+					return;
+				}
+
+				// Apply drawing event
+				ctx.globalCompositeOperation = "source-over";
+				ctx.strokeStyle = data.color || "#000000";
+				ctx.lineWidth = data.width || data.lineWidth || 5;
+				ctx.globalAlpha = data.opacity !== undefined ? data.opacity : 1.0;
+
+				switch (data.tool) {
+					case "brush":
+						ctx.beginPath();
+						ctx.moveTo(data.startX, data.startY);
+						ctx.lineTo(data.endX, data.endY);
+						ctx.stroke();
+						break;
+					case "line":
+						ctx.beginPath();
+						ctx.moveTo(data.startX, data.startY);
+						ctx.lineTo(data.endX, data.endY);
+						ctx.stroke();
+						break;
+					case "rectangle":
+						ctx.globalCompositeOperation = "source-over";
+						ctx.strokeStyle = data.color || "#000000";
+						ctx.lineWidth = data.lineWidth || data.width || 5;
+						ctx.fillStyle = "rgba(0,0,0,0)"; // Use fully transparent fill
+						ctx.lineJoin = "miter";
+						ctx.lineCap = "butt";
+						ctx.beginPath();
+						ctx.rect(data.startX, data.startY, data.width, data.height);
+						ctx.stroke();
+						break;
+					case "circle":
+						ctx.beginPath();
+						ctx.arc(data.centerX, data.centerY, data.radius, 0, Math.PI * 2);
+						ctx.stroke();
+						break;
+					case "text":
+						ctx.font = `${data.fontSize}px Arial`;
+						ctx.fillStyle = data.color || "#000000";
+						ctx.fillText(data.text, data.x, data.y);
+						break;
+				}
+			});
+
+			// Apply eraser events after all drawing events
+			if (eraserEvents.length > 0) {
+				eraserEvents.forEach((data) => {
+					ctx.globalCompositeOperation = "destination-out";
+
+					if (data.startX !== undefined && data.endY !== undefined) {
+						ctx.lineWidth = data.width;
+						ctx.beginPath();
+						ctx.moveTo(data.startX, data.startY);
+						ctx.lineTo(data.endX, data.endY);
+						ctx.stroke();
+					}
+
+					ctx.beginPath();
+					const eraserX = data.endX || data.startX;
+					const eraserY = data.endY || data.startY;
+					ctx.arc(eraserX, eraserY, data.width / 2, 0, Math.PI * 2, false);
+					ctx.fill();
+				});
+			}
+
+			// Reset context properties and save state
+			ctx.globalCompositeOperation = "source-over";
+			ctx.globalAlpha = 1.0;
+			saveState();
+
+			// showToast("Board synchronized", "info");
+		}
+	});
+
+	// Start sync interval when connected
+	socket.on("connect", () => {
+		setupSyncInterval();
+	});
+
+	// Setup sync interval also after roomData received
+	socket.on("roomData", () => {
+		setupSyncInterval();
+	});
+
+	// Clear interval on disconnect
+	socket.on("disconnect", () => {
+		if (syncInterval) {
+			clearInterval(syncInterval);
+		}
 	});
 
 	// Users panel toggle functionality
@@ -1011,11 +2056,5 @@ document.addEventListener("DOMContentLoaded", function () {
 		// Ensure it's exactly 6 digits by using modulo and padding
 		let sixDigitCode = ((numericValue % 900000) + 100000).toString();
 		return sixDigitCode;
-	}
-
-	// Update currentWidth when tool changes
-	function updateToolSize() {
-		currentColor = toolColors[currentTool];
-		currentWidth = toolSizes[currentTool];
 	}
 });
