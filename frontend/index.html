@@ -61,6 +61,31 @@
       </div>
     </section>
 
+    <!-- Past Boards Section -->
+    <section id="pastBoards" class="past-boards">
+      <div class="container">
+        <h2>Your Boards</h2>
+        <div class="boards-container" id="pastBoardsList">
+          <!-- Boards will be loaded here dynamically -->
+          <div class="no-boards-message" id="noBoards">
+            <p>You don't have any boards yet. Create your first board above!</p>
+          </div>
+        </div>
+        <!-- Login prompt for guests -->
+        <div class="login-prompt" id="loginPrompt" style="display: none;">
+          <div class="login-prompt-content">
+            <i class="fas fa-lock"></i>
+            <h3>Board History</h3>
+            <p>Log in to view and manage your saved boards.</p>
+            <div class="login-prompt-actions">
+              <a href="auth.html?tab=login" class="btn btn-primary">Log In</a>
+              <a href="auth.html?tab=register" class="btn btn-outline">Sign Up</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section id="features" class="features">
       <div class="feature-card">
         <div class="feature-icon">

@@ -164,23 +164,36 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.6);
   z-index: 1000;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s, visibility 0.3s;
 }
 
 .modal.active {
   display: flex;
+  opacity: 1;
+  visibility: visible;
 }
 
 .modal-content {
   background-color: white;
   border-radius: var(--radius);
-  box-shadow: var(--shadow-lg);
   width: 90%;
   max-width: 500px;
-  overflow: hidden;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: var(--shadow-lg);
+  transform: scale(0.95);
+  transition: transform 0.3s;
+}
+
+.modal.active .modal-content {
+  transform: scale(1);
 }
 
 .modal-header {
@@ -194,6 +207,9 @@
 .modal-header h3 {
   margin: 0;
   font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .close-btn {
@@ -212,9 +228,17 @@
   padding: 1.5rem;
 }
 
+.modal-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: flex-end;
+}
+
 .share-link {
   display: flex;
   margin: 1rem 0;
+  width: 100%;
 }
 
 .share-link input {
@@ -223,21 +247,34 @@
   border: 1px solid var(--border-color);
   border-radius: var(--radius) 0 0 var(--radius);
   font-size: 0.875rem;
+  background-color: #f5f5f5;
 }
 
 .share-link button {
   border-radius: 0 var(--radius) var(--radius) 0;
+  white-space: nowrap;
 }
 
 .share-options {
   margin-top: 1.5rem;
 }
 
+.option-group {
+  background-color: #f9fafb;
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
 .option {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.option input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
 }
 
 .password-input {
@@ -245,6 +282,7 @@
   flex-direction: row;
   align-items: center;
   margin-top: 10px;
+  width: 100%;
 }
 
 .password-input input {
@@ -436,27 +474,45 @@
   z-index: 1000;
 }
 
+/* Board code section */
 .board-code-section {
   margin: 1.5rem 0;
-  padding: 1rem;
-  background-color: #f5f7fa;
+  padding: 1.25rem;
+  background-color: #f9fafb;
   border-radius: var(--radius);
-  border: 1px dashed var(--border-color);
+  border: 1px solid #eaedf0;
+}
+
+.board-code-section p {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+  color: #4b5563;
 }
 
 .code-display {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 1rem;
-  margin-top: 0.5rem;
+  margin-top: 1rem;
 }
 
 .board-code {
-  font-size: 1.25rem;
+  display: inline-block;
+  font-size: 1.75rem;
   font-weight: 600;
-  font-family: monospace;
+  letter-spacing: 0.25rem;
   color: var(--primary-color);
-  letter-spacing: 2px;
+  background-color: white;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--primary-color);
+  box-shadow: var(--shadow-sm);
+}
+
+#copyCodeBtn {
+  white-space: nowrap;
+  height: max-content;
 }
 
 /* Password Modal */
@@ -559,4 +615,7 @@
     outline: none;
     border-color: #4a90e2;
     box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+}
+.hide {
+  display: none;
 }

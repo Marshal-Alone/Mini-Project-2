@@ -1,6 +1,192 @@
 import config from './config.js';
 
 document.addEventListener("DOMContentLoaded", function () {
+	// Function to load past boards
+	const loadPastBoards = async () => {
+		const pastBoardsList = document.getElementById("pastBoardsList");
+		const noBoards = document.getElementById("noBoards");
+		
+		if (!pastBoardsList) return;
+		
+		try {
+			const token = localStorage.getItem("token");
+			if (!token) {
+				if (noBoards) noBoards.style.display = "block";
+				return;
+			}
+			
+			// Show loading state
+			pastBoardsList.innerHTML = '<div class="loading">Loading your boards...</div>';
+			
+			const response = await fetch(`${config.API_URL}/api/boards`, {
+				headers: {
+					Authorization: `Bearer ${token}`
+				}
+			});
+			
+			if (response.ok) {
+				const data = await response.json();
+				const boards = data.boards;
+				
+				// Clear loading message
+				pastBoardsList.innerHTML = '';
+				
+				if (boards.length === 0) {
+					// Show "no boards" message if no boards exist
+					if (noBoards) noBoards.style.display = "block";
+				} else {
+					// Hide "no boards" message
+					if (noBoards) noBoards.style.display = "none";
+					
+					// Display each board
+					boards.forEach(board => {
+						const boardCard = createBoardCard(board);
+						pastBoardsList.appendChild(boardCard);
+					});
+				}
+			} else {
+				console.error("Failed to load boards");
+				pastBoardsList.innerHTML = '<div class="error">Failed to load your boards. Please try again.</div>';
+			}
+		} catch (error) {
+			console.error("Error loading boards:", error);
+			pastBoardsList.innerHTML = '<div class="error">Error loading your boards. Please refresh the page.</div>';
+		}
+	};
+	
+	// Create board card element
+	const createBoardCard = (board) => {
+		const card = document.createElement("div");
+		card.className = "board-card";
+		
+		// Format date
+		const createdDate = new Date(board.createdAt);
+		const formattedDate = createdDate.toLocaleDateString('en-US', { 
+			year: 'numeric', 
+			month: 'short', 
+			day: 'numeric' 
+		});
+		
+		card.innerHTML = `
+			<div class="board-card-header">
+				<h3>${board.name}</h3>
+			</div>
+			<div class="board-card-date">
+				Created: ${formattedDate}
+			</div>
+			<div class="board-card-actions">
+				<button class="btn btn-primary join-board" data-room-id="${board.roomId}" data-name="${board.name}">
+					<i class="fas fa-sign-in-alt"></i> Join
+				</button>
+				<button class="btn board-delete" data-room-id="${board.roomId}">
+					<i class="fas fa-trash"></i> Delete
+				</button>
+			</div>
+		`;
+		
+		// Add event listeners to buttons
+		card.querySelector('.join-board').addEventListener('click', (e) => {
+			const roomId = e.currentTarget.getAttribute('data-room-id');
+			const name = e.currentTarget.getAttribute('data-name');
+			window.location.href = `/board?room=${encodeURIComponent(roomId)}&name=${encodeURIComponent(name)}`;
+		});
+		
+		card.querySelector('.board-delete').addEventListener('click', async (e) => {
+			const roomId = e.currentTarget.getAttribute('data-room-id');
+			if (confirm("Are you sure you want to delete this board? This action cannot be undone.")) {
+				await deleteBoard(roomId, card);
+			}
+		});
+		
+		return card;
+	};
+	
+	// Delete board function
+	const deleteBoard = async (roomId, cardElement) => {
+		try {
+			const token = localStorage.getItem("token");
+			const response = await fetch(`${config.API_URL}/api/boards/${roomId}`, {
+				method: "DELETE",
+				headers: {
+					Authorization: `Bearer ${token}`
+				}
+			});
+			
+			if (response.ok) {
+				// Remove card from UI with animation
+				cardElement.style.opacity = "0";
+				cardElement.style.transform = "scale(0.8)";
+				setTimeout(() => {
+					cardElement.remove();
+					
+					// Check if there are no more boards
+					const pastBoardsList = document.getElementById("pastBoardsList");
+					if (pastBoardsList && pastBoardsList.children.length === 0) {
+						const noBoards = document.getElementById("noBoards");
+						if (noBoards) noBoards.style.display = "block";
+					}
+				}, 300);
+			} else {
+				alert("Failed to delete board. Please try again.");
+			}
+		} catch (error) {
+			console.error("Error deleting board:", error);
+			alert("An error occurred while trying to delete the board.");
+		}
+	};
+
+	// Initialize past boards section
+	const initializePastBoards = async () => {
+		const pastBoardsSection = document.getElementById("pastBoards");
+		const loginPrompt = document.getElementById("loginPrompt");
+		const boardsList = document.getElementById("pastBoardsList");
+		const noBoards = document.getElementById("noBoards");
+		
+		if (pastBoardsSection) {
+			const user = await checkAuth();
+			
+			if (user) {
+				// User is logged in - initially hide the section and check for boards
+				if (loginPrompt) loginPrompt.style.display = "none";
+				if (boardsList) boardsList.style.display = "grid";
+				
+				try {
+					const token = localStorage.getItem("token");
+					const response = await fetch(`${config.API_URL}/api/boards`, {
+						headers: {
+							Authorization: `Bearer ${token}`
+						}
+					});
+					
+					if (response.ok) {
+						const data = await response.json();
+						const boards = data.boards;
+						
+						if (boards.length === 0) {
+							// User has no boards, hide the entire section
+							pastBoardsSection.style.display = "none";
+						} else {
+							// User has boards, show the section and load boards
+							pastBoardsSection.style.display = "block";
+							await loadPastBoards();
+						}
+					} else {
+						console.error("Failed to check boards");
+						pastBoardsSection.style.display = "none";
+					}
+				} catch (error) {
+					console.error("Error checking boards:", error);
+					pastBoardsSection.style.display = "none";
+				}
+			} else {
+				// User is not logged in - show login prompt and hide boards
+				pastBoardsSection.style.display = "block";
+				if (loginPrompt) loginPrompt.style.display = "block";
+				if (boardsList) boardsList.style.display = "none";
+			}
+		}
+	};
+
 	// Check if user is logged in
 	const checkAuth = async () => {
 		try {
@@ -337,11 +523,9 @@ document.addEventListener("DOMContentLoaded", function () {
 		});
 	}
 
-	// Check auth on page load
-	checkAuth().then((user) => {
-		if (user) {
-			localStorage.setItem("user", JSON.stringify(user));
-		}
-		updateAuthUI(user);
-	});
+	// Initialize past boards on page load
+	initializePastBoards();
+	
+	// Check and update auth status on page load
+	checkAuth().then(updateAuthUI);
 });

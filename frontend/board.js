@@ -12,10 +12,14 @@ document.addEventListener("DOMContentLoaded", function () {
 	}
 
 	// Socket.io setup
-	const socket = io('https://collaboard-backend-cdr6.onrender.com', {
+	const socket = io('http://localhost:3000', {
 		transports: ['websocket'],
 		withCredentials: true
 	});
+	// const socket = io('https://collaboard-backend-cdr6.onrender.com', {
+	// 	transports: ['websocket'],
+	// 	withCredentials: true
+	// });
 
 	// Connection status handling
 	socket.on('connect', () => {
@@ -426,18 +430,24 @@ document.addEventListener("DOMContentLoaded", function () {
 		if (currentTool === "text") {
 			const text = prompt("Enter text:");
 			if (text) {
-				ctx.font = `${currentWidth * 3}px Arial`;
-				ctx.fillStyle = currentColor;
+				// Get text settings
+				const fontSize = textSizeSlider ? parseInt(textSizeSlider.value) : currentWidth * 3;
+				const textColor = textColorInput ? textColorInput.value : currentColor;
+				
+				// Set font and color
+				ctx.font = `${fontSize}px Arial`;
+				ctx.fillStyle = textColor;
 				ctx.fillText(text, lastX, lastY);
 
-				// Emit text event
+				// Emit text event with enhanced settings
 				socket.emit("drawEvent", {
 					tool: "text",
 					x: lastX,
 					y: lastY,
 					text: text,
-					color: currentColor,
-					fontSize: currentWidth * 3,
+					color: textColor,
+					fontSize: fontSize,
+					font: "Arial"
 				});
 
 				saveState();
@@ -559,7 +569,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
 			case "text":
 				ctx.globalCompositeOperation = "source-over"; // Ensure normal drawing mode
-				ctx.font = `${data.fontSize}px Arial`;
+				const font = data.font || "Arial";
+				ctx.font = `${data.fontSize}px ${font}`;
 				ctx.fillStyle = data.color || "#000000";
 				ctx.fillText(data.text, data.x, data.y);
 				break;
@@ -693,6 +704,23 @@ document.addEventListener("DOMContentLoaded", function () {
 	// const eraserCursor = document.getElementById("eraserCursor");
 	const eraserSizeSlider = document.getElementById("eraserSize");
 	// const eraserSizeControl = document.getElementById("eraserSizeControl");
+	const textSettings = document.getElementById("textSettings");
+	const textColorInput = document.getElementById("textColor");
+	const textSizeSlider = document.getElementById("textSize");
+	const textFontSelect = document.getElementById("textFont");
+
+	// Update text settings
+	if (textColorInput) {
+		textColorInput.addEventListener("input", (e) => {
+			currentColor = e.target.value;
+		});
+	}
+
+	if (textSizeSlider) {
+		textSizeSlider.addEventListener("input", (e) => {
+			currentWidth = parseInt(e.target.value);
+		});
+	}
 
 	// Update eraser cursor size when slider changes
 	if (eraserSizeSlider) {
@@ -729,12 +757,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			// Hide all settings panels first
 			brushSettingsPopup.style.display = "none";
 			eraserSettings.style.display = "none";
-			// const lineSettings = document.getElementById("lineSettings");
-			// const rectangleSettings = document.getElementById("rectangleSettings");
-			// const circleSettings = document.getElementById("circleSettings");
-			// lineSettings.style.display = "none";
-			// rectangleSettings.style.display = "none";
-			// circleSettings.style.display = "none";
+			textSettings.style.display = "none";
 
 			// Explicitly hide eraser cursor when switching tools
 			const eraserCursor = document.getElementById("eraserCursor");
@@ -757,17 +780,11 @@ document.addEventListener("DOMContentLoaded", function () {
 				case "brush":
 					brushSettingsPopup.style.display = "block";
 					break;
-				// case "line":
-				// lineSettings.style.display = "block";
-				// break;
-				// case "rectangle":
-				// rectangleSettings.style.display = "block";
-				// break;
-				// case "circle":
-				// circleSettings.style.display = "block";
-				// break;
 				case "eraser":
 					eraserSettings.style.display = "block";
+					break;
+				case "text":
+					textSettings.style.display = "block";
 					break;
 			}
 
@@ -879,56 +896,119 @@ document.addEventListener("DOMContentLoaded", function () {
 	const copyLinkBtn = document.getElementById("copyLinkBtn");
 
 	// Initially hide the share button until we confirm ownership
-	shareBtn.style.display = "none";
-
-	shareBtn.addEventListener("click", () => {
-		// Set the share link
-		shareLink.value = window.location.href;
-
-		// Generate and display a 6-digit code instead of the full roomId
-		const boardCodeElement = document.getElementById("boardCode");
-		if (boardCodeElement) {
-			// Generate a 6-digit code from the roomId
-			// Using a hash function to ensure consistent codes for the same roomId
-			const sixDigitCode = generateSixDigitCode(roomId);
-			boardCodeElement.textContent = sixDigitCode;
-		}
-
-		// Show the modal
-		shareModal.classList.add("active");
-	});
-
-	// Function to generate a 6-digit code from roomId
-	function generateSixDigitCode(roomId) {
-		// Check if roomId is null or undefined
-		if (!roomId) {
-			console.warn("Warning: Attempted to generate code for undefined or null roomId");
-			return "000000"; // Return a default code for null/undefined roomIds
-		}
-
-		// Simple hash function to generate a numeric code from a string
-		let numericValue = 0;
-		for (let i = 0; i < roomId.length; i++) {
-			numericValue += roomId.charCodeAt(i);
-		}
-
-		// Ensure it's exactly 6 digits by using modulo and padding
-		let sixDigitCode = ((numericValue % 900000) + 100000).toString();
-		return sixDigitCode;
+	if (shareBtn) {
+		shareBtn.style.display = "none"; // Default to hiding it
+	}
+	
+	// Initially hide the invite button until we confirm ownership
+	const inviteUserBtn = document.getElementById("inviteUser");
+	if (inviteUserBtn) {
+		inviteUserBtn.style.display = "none"; // Default to hiding it
 	}
 
-	closeBtn.addEventListener("click", () => {
-		shareModal.classList.remove("active");
+	// Handle user rights
+	let isOwner = false;
+	socket.on("userRights", ({ isOwner: ownerStatus }) => {
+		console.log("userRights event received with ownerStatus:", ownerStatus);
+		isOwner = ownerStatus === true; // Force boolean conversion
+		// Show/hide share button based on ownership
+		const shareBtn = document.getElementById("shareBtn");
+		const inviteUserBtn = document.getElementById("inviteUser");
+		
+		// Make sure both buttons exist before trying to modify them
+		if (shareBtn && inviteUserBtn) {
+			// Make sure the share button is visible for owners
+			if (isOwner === true) {
+				console.log("isOwner is true - showing share and invite buttons");
+				shareBtn.style.display = "block";
+				inviteUserBtn.style.display = "block";
+			} else {
+				console.log("isOwner is false - hiding share and invite buttons");
+				shareBtn.style.display = "none";
+				inviteUserBtn.style.display = "none";
+			}
+		} else {
+			console.error("Share or invite buttons not found in the DOM");
+		}
+		
+		console.log(`User rights updated - isOwner: ${isOwner}`);
+	});
+	
+	// Set up explicit share button handler with event delegation (more reliable)
+	document.addEventListener('click', function(e) {
+		// Check if the clicked element is the share button or a child of it
+		if (e.target.id === 'shareBtn' || e.target.closest('#shareBtn')) {
+			e.preventDefault();
+			e.stopPropagation();
+			console.log("Share button clicked via delegation");
+			
+			// Set the share link
+			if (shareLink) {
+				shareLink.value = window.location.href;
+				console.log("Share link set to:", window.location.href);
+			}
+			
+			// Generate and display a 6-digit code
+			const boardCodeElement = document.getElementById("boardCode");
+			if (boardCodeElement) {
+				const sixDigitCode = generateSixDigitCode(roomId);
+				boardCodeElement.textContent = sixDigitCode;
+				console.log("Board code generated:", sixDigitCode);
+			}
+			
+			// Show the modal - ensure it's visible
+			if (shareModal) {
+				shareModal.style.removeProperty('display'); // Remove any inline display style
+				shareModal.classList.add("active");
+				console.log("Share modal opened via delegation");
+				
+				// Force repaint to ensure smooth animation
+				setTimeout(() => {
+					shareModal.style.opacity = "1";
+					shareModal.style.visibility = "visible";
+				}, 10);
+			} else {
+				console.error("Share modal element not found");
+			}
+		}
 	});
 
-	closeBtn2.addEventListener("click", () => {
-		shareModal.classList.remove("active");
-	});
+	// Ensure close buttons work properly
+	if (closeBtn) {
+		closeBtn.addEventListener("click", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			shareModal.classList.remove("active");
+			
+			// Add delay before hiding to allow animation to complete
+			setTimeout(() => {
+				shareModal.style.display = "none";
+			}, 300);
+		});
+	}
+
+	if (closeBtn2) {
+		closeBtn2.addEventListener("click", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			shareModal.classList.remove("active");
+			
+			// Add delay before hiding to allow animation to complete
+			setTimeout(() => {
+				shareModal.style.display = "none";
+			}, 300);
+		});
+	}
 
 	// Close modal when clicking outside
 	window.addEventListener("click", (e) => {
 		if (e.target === shareModal) {
 			shareModal.classList.remove("active");
+			
+			// Add delay before hiding to allow animation to complete
+			setTimeout(() => {
+				shareModal.style.display = "none";
+			}, 300);
 		}
 	});
 
@@ -1103,7 +1183,7 @@ document.addEventListener("DOMContentLoaded", function () {
           </button>
           <button class="btn btn-primary" id="submitPasswordBtn">Join</button>
         </div>
-        <div id="passwordError" class="error-message" style="display: none;"></div>
+        <div id="passwordError" class="error-message" style="display: none; margin-top: 40px;"></div>
       </div>
     </div>
   `;
@@ -1140,6 +1220,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		if (!password) {
 			errorElement.textContent = "Please enter a password";
 			errorElement.style.display = "block";
+			errorElement.style.opacity = "1";
 			return;
 		}
 
@@ -1170,6 +1251,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			const errorElement = document.getElementById("passwordError");
 			errorElement.textContent = message || "Incorrect password";
 			errorElement.style.display = "block";
+			errorElement.style.opacity = "1";
 		}
 	});
 
@@ -1178,14 +1260,59 @@ document.addEventListener("DOMContentLoaded", function () {
 		passwordModal.classList.add("active");
 	});
 
-	// Handle user rights
-	let isOwner = false;
-	socket.on("userRights", ({ isOwner: ownerStatus }) => {
-		isOwner = ownerStatus;
-		// Show/hide share button based on ownership
-		const shareBtn = document.getElementById("shareBtn");
-		shareBtn.style.display = isOwner ? "block" : "none";
+	// Also listen for roomData event to ensure we get ownership status
+	socket.on("roomData", (data) => {
+		console.log("roomData received, sending userReady event");
+		// Immediately send userReady event to get ownership status
+		setTimeout(() => {
+			socket.emit("userReady", { roomId });
+			console.log("userReady event sent after roomData received");
+			
+			// Also explicitly check ownership as a backup mechanism
+			setTimeout(() => {
+				console.log("Explicitly checking ownership status");
+				socket.emit("checkOwnership", { roomId });
+			}, 1000);
+		}, 500);
 	});
+
+	// Make inviteUser button open the share modal
+	if (inviteUserBtn) {
+		inviteUserBtn.addEventListener("click", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			console.log("Invite button clicked - opening share modal");
+			
+			// Set the share link
+			if (shareLink) {
+				shareLink.value = window.location.href;
+				console.log("Share link set to:", window.location.href);
+			}
+
+			// Generate and display a 6-digit code
+			const boardCodeElement = document.getElementById("boardCode");
+			if (boardCodeElement) {
+				const sixDigitCode = generateSixDigitCode(roomId);
+				boardCodeElement.textContent = sixDigitCode;
+				console.log("Board code generated for invite:", sixDigitCode);
+			}
+
+			// Show the modal - ensure it's visible
+			if (shareModal) {
+				shareModal.style.removeProperty('display'); // Remove any inline display style
+				shareModal.classList.add("active");
+				console.log("Share modal opened from invite button");
+				
+				// Force repaint to ensure smooth animation
+				setTimeout(() => {
+					shareModal.style.opacity = "1";
+					shareModal.style.visibility = "visible";
+				}, 10);
+			} else {
+				console.error("Share modal element not found for invite button");
+			}
+		});
+	}
 
 	// Join room
 	const hasLocalAuth = localStorage.getItem(`board_auth_${roomId}`) === "true";
@@ -1212,6 +1339,17 @@ document.addEventListener("DOMContentLoaded", function () {
 						hasLocalAuth,
 						token,
 					});
+					
+					// Explicitly notify server that user is ready to receive rights info
+					setTimeout(() => {
+						socket.emit("userReady", { roomId });
+						
+						// Double check ownership after a delay
+						setTimeout(() => {
+							console.log("Explicitly checking ownership after joining room");
+							socket.emit("checkOwnership", { roomId });
+						}, 1500);
+					}, 1000);
 				} else {
 					// Token invalid, join as guest
 					socket.emit("joinRoom", {
@@ -1462,6 +1600,12 @@ document.addEventListener("DOMContentLoaded", function () {
 			password: null,
 			hasLocalAuth: hasLocalAuth || (userId && storedUserId === userId),
 		});
+		
+		// After joining, send userReady to get user rights
+		setTimeout(() => {
+			socket.emit("userReady", { roomId });
+			console.log("Sent userReady event to get user rights");
+		}, 1000);
 	});
 
 	socket.on("disconnect", () => {
@@ -1822,4 +1966,23 @@ document.addEventListener("DOMContentLoaded", function () {
 			localStorage.setItem("usersPanelCollapsed", false);
 		}
 	});
+
+	// Function to generate a 6-digit code from roomId
+	function generateSixDigitCode(roomId) {
+		// Check if roomId is null or undefined
+		if (!roomId) {
+			console.warn("Warning: Attempted to generate code for undefined or null roomId");
+			return "000000"; // Return a default code for null/undefined roomIds
+		}
+
+		// Simple hash function to generate a numeric code from a string
+		let numericValue = 0;
+		for (let i = 0; i < roomId.length; i++) {
+			numericValue += roomId.charCodeAt(i);
+		}
+
+		// Ensure it's exactly 6 digits by using modulo and padding
+		let sixDigitCode = ((numericValue % 900000) + 100000).toString();
+		return sixDigitCode;
+	}
 });

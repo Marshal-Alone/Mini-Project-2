@@ -1,3 +1,6 @@
+// Suppress punycode deprecation warning
+process.removeAllListeners('warning');
+
 console.log("-------------------STARTING SERVER-------------------");
 
 require("dotenv").config();
@@ -14,7 +17,7 @@ const Board = require("./models/Board");
 const bcrypt = require("bcryptjs");
 const mongoose = require("mongoose");
 
-// Connect to MongoDB
+// Connect to MongoDB with optimized settings and connection pooling
 connectDB();
 
 mongoose
@@ -22,7 +25,13 @@ mongoose
 		useNewUrlParser: true,
 		useUnifiedTopology: true,
 		retryWrites: true,
-		w: 'majority'
+		w: 'majority',
+		maxPoolSize: 10,
+		socketTimeoutMS: 45000,
+		serverSelectionTimeoutMS: 30000,
+		// Connection optimization
+		keepAlive: true,
+		keepAliveInitialDelay: 300000
 	})
 	.then(() => {
 		console.log("");
@@ -237,14 +246,16 @@ app.post("/api/boards", authenticateToken, async (req, res) => {
 
 		// Generate a unique room ID
 		const roomId = uuidv4();
-		console.log("ROOM ID = ", roomId);
+		
 		// Create board
 		const board = await Board.create({
 			name,
 			roomId,
 			createdBy: userId,
 		});
-		console.log("BOARD = ", board);
+		
+		console.log(`User ${req.user.name} created new board: ${name}`);
+		
 		res.status(201).json({
 			message: "Board created successfully",
 			board,
@@ -259,13 +270,41 @@ app.post("/api/boards", authenticateToken, async (req, res) => {
 app.get("/api/boards", authenticateToken, async (req, res) => {
 	try {
 		const userId = req.user.id;
-		console.log("USER ID = ", userId);
+		
 		// Get boards
 		const boards = await Board.find({ createdBy: userId });
 
 		res.status(200).json({ boards });
 	} catch (error) {
 		console.error("Get boards error:", error);
+		res.status(500).json({ error: "Server error" });
+	}
+});
+
+// Delete a board
+app.delete("/api/boards/:roomId", authenticateToken, async (req, res) => {
+	try {
+		const { roomId } = req.params;
+		const userId = req.user.id;
+
+		// Find the board first to verify ownership
+		const board = await Board.findOne({ roomId });
+		
+		if (!board) {
+			return res.status(404).json({ error: "Board not found" });
+		}
+		
+		// Verify the user is the owner of the board
+		if (board.createdBy !== userId) {
+			return res.status(403).json({ error: "You do not have permission to delete this board" });
+		}
+		
+		// Delete the board
+		await Board.deleteOne({ roomId });
+		
+		res.status(200).json({ message: "Board deleted successfully" });
+	} catch (error) {
+		console.error("Board deletion error:", error);
 		res.status(500).json({ error: "Server error" });
 	}
 });
@@ -381,13 +420,12 @@ io.on("connection", (socket) => {
 		} catch (error) {
 			roomName = roomId;
 		}
-		// console.log(`User ${userName} attempting to join room ${roomName}`);
 
 		try {
 			const boardForAuth = await Board.findOne({ roomId });
 
 			if (boardForAuth && boardForAuth.isPasswordProtected) {
-				const isOwner = userId && boardForAuth.createdBy === userId;
+				const isOwner = !!(userId && boardForAuth.createdBy === userId);
 				const isAuthorized = rooms[roomId]?.authorizedUsers?.includes(userId || socket.id);
 
 				if (!isOwner && !isAuthorized && !hasLocalAuth) {
@@ -424,7 +462,7 @@ io.on("connection", (socket) => {
 
 			// If user exists with different socket ID, remove the old entry
 			if (existingSocketId && existingSocketId !== socket.id) {
-				console.log(`User ${userName} reconnected with new socket. Replacing old socket.`);
+				console.log(`User ${userName} reconnected with new socket.`);
 				delete rooms[roomId].users[existingSocketId];
 			}
 
@@ -462,28 +500,23 @@ io.on("connection", (socket) => {
 					createdBy: userId || socketId,
 				});
 				await board.save();
-			} else {
-				console
-					.log
-					// `Found existing board for room ${roomId} with ${board.history.length} history items`
-					();
 			}
 
 			// Send board history from database to the new user
-			console
-				.log
-				// `Sending room data to user ${userName} with ${board.history.length} history items`
-				();
 			socket.emit("roomData", {
 				users: Object.values(rooms[roomId].users),
 				history: board.history || [],
 			});
+			
+			// Check and notify if user is the owner
+			const isOwner = !!(userId && board.createdBy === userId);
+			socket.emit("userRights", { isOwner });
 
 			// Notify all clients about the new user
 			io.to(roomId).emit("userJoined", rooms[roomId].users[socketId]);
 			io.to(roomId).emit("userCount", Object.keys(rooms[roomId].users).length);
-
-			// console.log(`User ${userName} joined room ${roomName} successfully`);
+			
+			console.log(`User ${userName} joined board "${roomName}"`);
 		} catch (error) {
 			console.error("Error joining room:", error);
 			socket.emit("error", { message: "Error joining room" });
@@ -562,8 +595,6 @@ io.on("connection", (socket) => {
 
 			// Notify other users in the room that the room now requires a password
 			socket.to(roomId).emit("roomPasswordUpdated", true);
-
-			console.log(`Password set for room: ${roomId}`);
 		} catch (error) {
 			console.error("Error setting room password:", error);
 			socket.emit("error", { message: "Error setting password" });
@@ -593,8 +624,6 @@ io.on("connection", (socket) => {
 
 			// Notify other users in the room
 			socket.to(roomId).emit("roomPasswordUpdated", false);
-
-			console.log(`Password removed for room: ${roomId}`);
 		} catch (error) {
 			console.error("Error removing room password:", error);
 			socket.emit("error", { message: "Error removing password" });
@@ -606,22 +635,26 @@ io.on("connection", (socket) => {
 		try {
 			// Get board info from database
 			const boardInfo = await Board.findOne({ roomId });
-
-			// Send password status
+			
 			if (boardInfo) {
+				// Get user ID from the room users
+				const userId = rooms[roomId]?.users[socket.id]?.userId;
+				
+				// Send password status
 				socket.emit("roomPasswordStatus", boardInfo.isPasswordProtected);
 
-				// Send if user is owner
-				const userId = rooms[roomId].users[socket.id].userId;
-				const isOwner = userId && boardInfo.createdBy === userId;
+				// Check and send if user is owner
+				const isOwner = !!(userId && boardInfo.createdBy === userId);
 				socket.emit("userRights", { isOwner });
+			} else {
+				console.log(`Board not found for roomId: ${roomId}`);
 			}
 		} catch (error) {
 			console.error("Error in userReady:", error);
 		}
 	});
 
-	// Handle drawing events - moved out of userReady
+	// Handle drawing events
 	socket.on("drawEvent", async (data) => {
 		const roomId = socket.roomId;
 
@@ -644,12 +677,6 @@ io.on("connection", (socket) => {
 					},
 					{ new: true } // Return the updated document
 				);
-
-				// Log occasional updates to track drawing activity
-				if (Math.random() < 0.01) {
-					// Only log 1% of events to avoid spam
-					console.log(`Drawing event saved for board ${roomId}, tool: ${data.tool}`);
-				}
 			}
 		} catch (error) {
 			console.error("Error saving drawing event:", error);
@@ -657,7 +684,7 @@ io.on("connection", (socket) => {
 		}
 	});
 
-	// Handle clear canvas event - moved out of userReady
+	// Handle clear canvas event
 	socket.on("clearCanvas", async () => {
 		const roomId = socket.roomId;
 
@@ -677,53 +704,9 @@ io.on("connection", (socket) => {
 					}
 				);
 				const userName = rooms[roomId]?.users[socket.id]?.name || "Unknown User";
-				console.log(`Board cleared by ${userName}`);
+				console.log(`User ${userName} cleared board`);
 			} catch (error) {
 				console.error("Error clearing board history:", error);
-			}
-		}
-	});
-
-	// Handle disconnection
-	socket.on("disconnect", async () => {
-		const roomId = socket.roomId;
-		const userName = rooms[roomId]?.users[socket.id]?.name || "Unknown User";
-		console.log(`User disconnected: ${userName}`);
-
-		// Find which room this socket was in
-		if (roomId && rooms[roomId] && rooms[roomId].users) {
-			// Get user info before removing
-			const userInfo = rooms[roomId].users[socket.id];
-
-			// Remove user from room
-			delete rooms[roomId].users[socket.id];
-
-			// Notify other users with more information
-			if (userInfo) {
-				io.to(roomId).emit("userLeft", {
-					id: socket.id,
-					name: userInfo.name || "Unknown User",
-				});
-			} else {
-				io.to(roomId).emit("userLeft", {
-					id: socket.id,
-					name: "Unknown User",
-				});
-			}
-
-			io.to(roomId).emit("userCount", Object.keys(rooms[roomId].users).length);
-
-			// If room is empty, clean up (but don't delete from DB)
-			if (Object.keys(rooms[roomId].users).length === 0) {
-				delete rooms[roomId];
-				// Get board name if available
-				try {
-					const board = await Board.findOne({ roomId });
-					const roomName = board ? board.name : roomId;
-					console.log(`Room "${roomName}" is now empty and removed from memory`);
-				} catch (error) {
-					console.log(`Room ${roomId} is now empty and removed from memory`);
-				}
 			}
 		}
 	});
@@ -731,34 +714,86 @@ io.on("connection", (socket) => {
 	// Handle board sync requests
 	socket.on("requestBoardSync", async ({ roomId }) => {
 		try {
-			// if (!roomId) {
-			// 	// console.log("Board sync requested with no roomId");
-			// 	return;
-			// }
-
-			const userName = rooms[roomId]?.users[socket.id]?.name || "Unknown User";
-			// console.log(`Board sync requested for room ${roomId} by ${userName}`);
-
-			// Get the latest board data from the database
 			const board = await Board.findOne({ roomId }).select({ history: 1 });
 
 			if (board && board.history) {
-				console
-					.log
-					// `Sending board sync with ${board.history.length} history items to ${socket.id}`
-					();
-
 				// Send the full history back to the requesting client
 				socket.emit("boardSync", {
 					history: board.history,
 				});
 			} else {
-				console.log(`No board found for sync request on room ${roomId}`);
 				socket.emit("error", { message: "Board not found for sync" });
 			}
 		} catch (error) {
 			console.error("Error syncing board:", error);
 			socket.emit("error", { message: "Error syncing board" });
+		}
+	});
+	
+	// Add explicit ownership check handler
+	socket.on("checkOwnership", async (data) => {
+		try {
+			const { roomId } = data;
+			// Get user ID from the room users
+			const userId = rooms[roomId]?.users[socket.id]?.userId;
+			
+			// Fetch the board from the database
+			const board = await Board.findOne({ roomId });
+			
+			if (board) {
+				// Ensure we have a boolean, not undefined or null
+				const isOwner = !!(userId && board.createdBy === userId);
+				socket.emit("userRights", { isOwner });
+			} else {
+				console.log(`Board not found for ownership check: ${roomId}`);
+				socket.emit("userRights", { isOwner: false });
+			}
+		} catch (err) {
+			console.error("Error checking ownership:", err);
+			socket.emit("userRights", { isOwner: false });
+		}
+	});
+
+	// Handle disconnection
+	socket.on("disconnect", async () => {
+		const roomId = socket.roomId;
+		if (!roomId || !rooms[roomId] || !rooms[roomId].users) return;
+		
+		const userName = rooms[roomId]?.users[socket.id]?.name || "Unknown User";
+		console.log(`User ${userName} disconnected`);
+
+		// Get user info before removing
+		const userInfo = rooms[roomId].users[socket.id];
+
+		// Remove user from room
+		delete rooms[roomId].users[socket.id];
+
+		// Notify other users with more information
+		if (userInfo) {
+			io.to(roomId).emit("userLeft", {
+				id: socket.id,
+				name: userInfo.name || "Unknown User",
+			});
+		} else {
+			io.to(roomId).emit("userLeft", {
+				id: socket.id,
+				name: "Unknown User",
+			});
+		}
+
+		io.to(roomId).emit("userCount", Object.keys(rooms[roomId].users).length);
+
+		// If room is empty, clean up (but don't delete from DB)
+		if (Object.keys(rooms[roomId].users).length === 0) {
+			delete rooms[roomId];
+			// Get board name if available
+			try {
+				const board = await Board.findOne({ roomId });
+				const roomName = board ? board.name : roomId;
+				console.log(`Board "${roomName}" is now empty`);
+			} catch (error) {
+				console.log(`Room ${roomId} is now empty`);
+			}
 		}
 	});
 });

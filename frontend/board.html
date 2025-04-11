@@ -84,7 +84,7 @@
       <div class="tool-group style-tools">
         <span class="tool-group-label">Style</span>
         <div class="style-controls">
-          <div class="size-control">
+          <div class="size-control hide">
             <label for="brushSize">Brush Size:</label>
             <select id="brushSize" class="styled-select">
               <option value="2">Small</option>
@@ -93,7 +93,7 @@
               <option value="15">X-Large</option>
             </select>
           </div>
-          <div class="size-control">
+          <div class="size-control hide">
             <label for="lineSize">Line Size:</label>
             <select id="lineSize" class="styled-select">
               <option value="1">Thin</option>
@@ -101,7 +101,7 @@
               <option value="3">Thick</option>
             </select>
           </div>
-          <div class="size-control">
+          <div class="size-control hide">
             <label for="shapeSize">Shape Size:</label>
             <select id="shapeSize" class="styled-select">
               <option value="1">Thin</option>
@@ -230,6 +230,15 @@
     <label for="eraserSize">Eraser Size:</label>
     <input type="range" id="eraserSize" min="5" max="70" value="30" class="size-slider">
     <!-- <div id="eraserSizeControl"></div> -->
+  </div>
+
+  <div id="textSettings" class="text-settings" style="display: none;">
+    <h3>Text Settings</h3>
+    <label for="textColor">Text Color:</label>
+    <input type="color" id="textColor" value="#000000">
+    
+    <label for="textSize">Text Size:</label>
+    <input type="range" id="textSize" min="10" max="72" value="24" class="size-slider">
   </div>
 
   <!-- NO NEED -->
