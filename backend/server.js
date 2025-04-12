@@ -42,39 +42,13 @@ mongoose
 const app = express();
 const server = http.createServer(app);
 
-// CORS configuration
-const corsOptions = {
-	origin: process.env.NODE_ENV === 'production' 
-		? ['https://collaborative-whiteboard-z8ai.onrender.com']
-		: '*', // Allow all origins in development
-	methods: ['GET', 'POST', 'OPTIONS', 'PUT', 'DELETE'],
-	allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-	credentials: true,
-	preflightContinue: false,
-	optionsSuccessStatus: 204
-};
-
-// Apply CORS middleware before other middleware
-app.use((req, res, next) => {
-	const origin = req.headers.origin;
-	if (process.env.NODE_ENV === 'development' || corsOptions.origin.includes(origin)) {
-		res.setHeader('Access-Control-Allow-Origin', origin || '*');
-	}
-	res.setHeader('Access-Control-Allow-Methods', corsOptions.methods.join(','));
-	res.setHeader('Access-Control-Allow-Headers', corsOptions.allowedHeaders.join(','));
-	res.setHeader('Access-Control-Allow-Credentials', 'true');
-	res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
-	
-	// Handle preflight requests
-	if (req.method === 'OPTIONS') {
-		return res.status(corsOptions.optionsSuccessStatus).end();
-	}
-	
-	next();
-});
-
+// Initialize Socket.IO without CORS and with localhost only
 const io = new Server(server, {
-	cors: corsOptions
+	transports: ['websocket', 'polling'],
+	cors: {
+		origin: "http://localhost:5050",
+		methods: ["GET", "POST"]
+	}
 });
 
 // Middleware
@@ -82,10 +56,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Serve static files in development only
-if (process.env.NODE_ENV !== 'production') {
-	app.use(express.static(path.join(__dirname, "../frontend")));
-}
+// Serve static files directly
+app.use(express.static(path.join(__dirname, "../frontend")));
 
 // Store room data
 const rooms = {};
@@ -404,14 +376,8 @@ io.use(async (socket, next) => {
 });
 
 io.on("connection", (socket) => {
-	// Set custom socket options for better performance
-	socket.conn.on("packet", (packet) => {
-		if (packet.type === "ping") socket.conn.packetsFn = []; // Clear packet buffer on ping
-	});
-	// a user connected
-	//console.log("A user connected:", socket.id);
+	console.log("A user connected:", socket.id);
 
-	// Join a room
 	socket.on("joinRoom", async ({ roomId, userName, userId, password, hasLocalAuth }) => {
 		let roomName;
 		try {
@@ -771,6 +737,7 @@ io.on("connection", (socket) => {
 
 	// Handle disconnection
 	socket.on("disconnect", async () => {
+		console.log("User disconnected:", socket.id);
 		const roomId = socket.roomId;
 		if (!roomId || !rooms[roomId] || !rooms[roomId].users) return;
 		
@@ -869,131 +836,8 @@ const createTestUser = async () => {
 	}
 };
 
-// Start server
-const PORT = process.env.PORT || 5050;
-
-// Function to check if port is in use
-function isPortInUse(port) {
-	return new Promise((resolve) => {
-		const net = require("net");
-		const server = net.createServer();
-
-		server.once("error", (err) => {
-			if (err.code === "EADDRINUSE") {
-				resolve(true);
-			} else {
-				resolve(false);
-			}
-			server.close();
-		});
-
-		server.once("listening", () => {
-			server.close();
-			resolve(false);
-		});
-
-		server.listen(port);
-	});
-}
-
-// Function to find and kill process using a specific port on Windows
-function findAndKillProcessOnPort(port) {
-	return new Promise((resolve) => {
-		try {
-			// Use execSync for synchronous execution
-			const { execSync } = require("child_process");
-
-			// Get all PIDs in one go
-			const stdout = execSync(`netstat -ano | findstr :${port} | findstr LISTENING`).toString();
-
-			// Extract unique PIDs first
-			const pids = new Set();
-			const lines = stdout.trim().split("\n");
-
-			for (const line of lines) {
-				const parts = line.trim().split(/\s+/);
-				const pid = parts[parts.length - 1];
-				if (pid && !isNaN(parseInt(pid))) {
-					pids.add(pid);
-				}
-			}
-
-			// Now kill each unique PID
-			let success = false;
-			for (const pid of pids) {
-				//console.log(`Attempting to kill process ${pid}...`);
-				try {
-					execSync(`taskkill /F /PID ${pid}`);
-					//console.log(`Successfully killed process ${pid}`);
-					success = true;
-				} catch (killError) {
-					console.warn(`Process ${pid} already terminated: ${killError.message}`);
-				}
-			}
-
-			resolve(success);
-		} catch (error) {
-			if (error.message.includes("Command failed")) {
-				console.warn("No processes found using port", port);
-			} else {
-				console.warn("Error:", error.message);
-			}
-			resolve(false);
-		}
-	});
-}
-
-// Start server with port checking - improved version
-async function startServer() {
-	let inUse = await isPortInUse(PORT);
-	let attempts = 0;
-	const maxAttempts = 3;
-
-	while (inUse && attempts < maxAttempts) {
-		attempts++;
-		console.log(
-			`Port ${PORT} is already in use. Attempting to kill the process... (Attempt ${attempts}/${maxAttempts})`
-		);
-
-		if (process.platform === "win32") {
-			await findAndKillProcessOnPort(PORT);
-		} else {
-			// For Mac/Linux
-			try {
-				require("child_process").execSync(`lsof -i :${PORT} -t | xargs kill -9`);
-				//console.log(`Process using port ${PORT} was terminated`);
-			} catch (error) {
-				console.warn(`Could not kill process on port ${PORT}: ${error.message}`);
-			}
-		}
-
-		// Wait for the port to be released
-		await new Promise((resolve) => setTimeout(resolve, 2000));
-
-		// Check again if the port is still in use
-		inUse = await isPortInUse(PORT);
-	}
-
-	if (inUse) {
-		console.error(`Port ${PORT} is still in use after ${maxAttempts} attempts.`);
-		console.error(`Please manually close the application using port ${PORT} and try again.`);
-		process.exit(1);
-	}
-
-	// Start the server
-	server.listen(PORT, () => {
-		//console.log(`Server running on port ${PORT}`);
-	});
-
-	// Handle any errors that might still occur
-	server.on("error", (e) => {
-		if (e.code === "EADDRINUSE") {
-			console.error(`Failed to bind to port ${PORT}. The port is still in use.`);
-			process.exit(1);
-		} else {
-			console.error("Server error:", e);
-		}
-	});
-}
-
-startServer();
+// Start server on port 5050
+const PORT = 5050;
+server.listen(PORT, () => {
+	console.log(`Server running on http://localhost:${PORT}`);
+});

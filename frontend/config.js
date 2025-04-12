@@ -1,8 +1,5 @@
 const config = {
-    API_URL: window.location.hostname === 'localhost'
-        ? 'http://localhost:3000'
-        : 'http://localhost:3000'
-        // : 'https://collaboard-backend-cdr6.onrender.com'
+    API_URL: 'http://localhost:5050'
 };
 
 export default config; 
