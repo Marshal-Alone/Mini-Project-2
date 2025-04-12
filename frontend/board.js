@@ -23,12 +23,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Connection status handling
 	socket.on('connect', () => {
-		console.log('Connected to server');
+		//console.log('Connected to server');
 		connectionStatus.innerHTML = '<i class="fas fa-circle" style="color: #4CAF50;"></i> Connected';
 	});
 
 	socket.on('disconnect', () => {
-		console.log('Disconnected from server');
+		//console.log('Disconnected from server');
 		connectionStatus.innerHTML = '<i class="fas fa-circle" style="color: #f44336;"></i> Disconnected';
 	});
 
@@ -909,7 +909,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	// Handle user rights
 	let isOwner = false;
 	socket.on("userRights", ({ isOwner: ownerStatus }) => {
-		console.log("userRights event received with ownerStatus:", ownerStatus);
+		//console.log("userRights event received with ownerStatus:", ownerStatus);
 		isOwner = ownerStatus === true; // Force boolean conversion
 		// Show/hide share button based on ownership
 		const shareBtn = document.getElementById("shareBtn");
@@ -919,11 +919,11 @@ document.addEventListener("DOMContentLoaded", function () {
 		if (shareBtn && inviteUserBtn) {
 			// Make sure the share button is visible for owners
 			if (isOwner === true) {
-				console.log("isOwner is true - showing share and invite buttons");
+				//console.log("isOwner is true - showing share and invite buttons");
 				shareBtn.style.display = "block";
 				inviteUserBtn.style.display = "block";
 			} else {
-				console.log("isOwner is false - hiding share and invite buttons");
+				//console.log("isOwner is false - hiding share and invite buttons");
 				shareBtn.style.display = "none";
 				inviteUserBtn.style.display = "none";
 			}
@@ -931,7 +931,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			console.error("Share or invite buttons not found in the DOM");
 		}
 		
-		console.log(`User rights updated - isOwner: ${isOwner}`);
+		//console.log(`User rights updated - isOwner: ${isOwner}`);
 	});
 	
 	// Set up explicit share button handler with event delegation (more reliable)
@@ -940,12 +940,12 @@ document.addEventListener("DOMContentLoaded", function () {
 		if (e.target.id === 'shareBtn' || e.target.closest('#shareBtn')) {
 			e.preventDefault();
 			e.stopPropagation();
-			console.log("Share button clicked via delegation");
+			//console.log("Share button clicked via delegation");
 			
 			// Set the share link
 			if (shareLink) {
 				shareLink.value = window.location.href;
-				console.log("Share link set to:", window.location.href);
+				//console.log("Share link set to:", window.location.href);
 			}
 			
 			// Generate and display a 6-digit code
@@ -953,14 +953,14 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (boardCodeElement) {
 				const sixDigitCode = generateSixDigitCode(roomId);
 				boardCodeElement.textContent = sixDigitCode;
-				console.log("Board code generated:", sixDigitCode);
+				//console.log("Board code generated:", sixDigitCode);
 			}
 			
 			// Show the modal - ensure it's visible
 			if (shareModal) {
 				shareModal.style.removeProperty('display'); // Remove any inline display style
 				shareModal.classList.add("active");
-				console.log("Share modal opened via delegation");
+				//console.log("Share modal opened via delegation");
 				
 				// Force repaint to ensure smooth animation
 				setTimeout(() => {
@@ -1262,15 +1262,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Also listen for roomData event to ensure we get ownership status
 	socket.on("roomData", (data) => {
-		console.log("roomData received, sending userReady event");
+		//console.log("roomData received, sending userReady event");
 		// Immediately send userReady event to get ownership status
 		setTimeout(() => {
 			socket.emit("userReady", { roomId });
-			console.log("userReady event sent after roomData received");
+			//console.log("userReady event sent after roomData received");
 			
 			// Also explicitly check ownership as a backup mechanism
 			setTimeout(() => {
-				console.log("Explicitly checking ownership status");
+				//console.log("Explicitly checking ownership status");
 				socket.emit("checkOwnership", { roomId });
 			}, 1000);
 		}, 500);
@@ -1281,12 +1281,12 @@ document.addEventListener("DOMContentLoaded", function () {
 		inviteUserBtn.addEventListener("click", (e) => {
 			e.preventDefault();
 			e.stopPropagation();
-			console.log("Invite button clicked - opening share modal");
+			//console.log("Invite button clicked - opening share modal");
 			
 			// Set the share link
 			if (shareLink) {
 				shareLink.value = window.location.href;
-				console.log("Share link set to:", window.location.href);
+				//console.log("Share link set to:", window.location.href);
 			}
 
 			// Generate and display a 6-digit code
@@ -1294,14 +1294,14 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (boardCodeElement) {
 				const sixDigitCode = generateSixDigitCode(roomId);
 				boardCodeElement.textContent = sixDigitCode;
-				console.log("Board code generated for invite:", sixDigitCode);
+				//console.log("Board code generated for invite:", sixDigitCode);
 			}
 
 			// Show the modal - ensure it's visible
 			if (shareModal) {
 				shareModal.style.removeProperty('display'); // Remove any inline display style
 				shareModal.classList.add("active");
-				console.log("Share modal opened from invite button");
+				//console.log("Share modal opened from invite button");
 				
 				// Force repaint to ensure smooth animation
 				setTimeout(() => {
@@ -1346,7 +1346,7 @@ document.addEventListener("DOMContentLoaded", function () {
 						
 						// Double check ownership after a delay
 						setTimeout(() => {
-							console.log("Explicitly checking ownership after joining room");
+							//console.log("Explicitly checking ownership after joining room");
 							socket.emit("checkOwnership", { roomId });
 						}, 1500);
 					}, 1000);
@@ -1379,13 +1379,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Handle room data (users and history)
 	socket.on("roomData", ({ users, history: roomHistory }) => {
-		console.log(
-			"Received room data with",
-			users.length,
-			"users and",
-			roomHistory ? roomHistory.length : 0,
-			"history items"
-		);
+		// console.log(
+		// 	"Received room data with",
+		// 	users.length,
+		// 	"users and",
+		// 	roomHistory ? roomHistory.length : 0,
+		// 	"history items"
+		// );
 
 		// Update users list
 		updateUsersList(users);
@@ -1394,7 +1394,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		if (roomHistory && roomHistory.length > 0) {
 			// Clear canvas first to ensure we start fresh
 			ctx.clearRect(0, 0, canvas.width, canvas.height);
-			console.log("Applying board history...");
+			//console.log("Applying board history...");
 
 			// Sort history by timestamp if available to ensure correct order
 			if (roomHistory[0].timestamp) {
@@ -1413,7 +1413,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 				// Log progress for large histories
 				if (totalEvents > 100 && processedCount % 50 === 0) {
-					console.log(`Processing history: ${processedCount}/${totalEvents} events`);
+					//console.log(`Processing history: ${processedCount}/${totalEvents} events`);
 				}
 
 				if (data.tool === "eraser") {
@@ -1481,7 +1481,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 			// Second pass: apply eraser events
 			if (eraserEvents.length > 0) {
-				console.log(`Applying ${eraserEvents.length} eraser events`);
+				//console.log(`Applying ${eraserEvents.length} eraser events`);
 				eraserEvents.forEach((data) => {
 					ctx.globalCompositeOperation = "destination-out";
 
@@ -1513,7 +1513,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			}
 
 			// Save the fully applied history as a state
-			console.log("History applied, saving state");
+			//console.log("History applied, saving state");
 			saveState();
 			connectionStatus.classList.remove("disconnected");
 			connectionStatus.classList.add("connected");
@@ -1532,7 +1532,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Handle user joined
 	socket.on("userJoined", (userData) => {
-		console.log("User joined:", userData);
+		//console.log("User joined:", userData);
 
 		if (userData.id === socket.id) {
 			currentUserId = userData.id;
@@ -1573,7 +1573,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Handle user count update
 	socket.on("userCount", (count) => {
-		console.log("User count updated:", count);
+		//console.log("User count updated:", count);
 		document.getElementById("usersCount").textContent = `${count} user${count !== 1 ? "s" : ""}`;
 	});
 
@@ -1581,7 +1581,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	socket.on("connect", () => {
 		connectionStatus.classList.remove("disconnected");
 		connectionStatus.classList.add("connected");
-		console.log("Connected to server with socket ID:", socket.id);
+		//console.log("Connected to server with socket ID:", socket.id);
 
 		// Get the user name before joining the room
 		const userName = promptForUserName();
@@ -1604,12 +1604,12 @@ document.addEventListener("DOMContentLoaded", function () {
 		// After joining, send userReady to get user rights
 		setTimeout(() => {
 			socket.emit("userReady", { roomId });
-			console.log("Sent userReady event to get user rights");
+			//console.log("Sent userReady event to get user rights");
 		}, 1000);
 	});
 
 	socket.on("disconnect", () => {
-		console.log("Disconnected from server");
+		//console.log("Disconnected from server");
 
 		const connectionStatus = document.getElementById("connectionStatus");
 		connectionStatus.innerHTML = '<i class="fas fa-circle disconnected"></i> Disconnected';
@@ -1621,7 +1621,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Add this new event handler for reconnect
 	socket.on("reconnect", () => {
-		console.log("Reconnected to server");
+		//console.log("Reconnected to server");
 
 		const connectionStatus = document.getElementById("connectionStatus");
 		connectionStatus.innerHTML = '<i class="fas fa-circle connected"></i> Connected';
@@ -1639,7 +1639,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Users list functions
 	function updateUsersList(users) {
-		console.log("Updating users list with", users.length, "users");
+		//console.log("Updating users list with", users.length, "users");
 
 		const usersList = document.getElementById("usersList");
 		const existingUsers = new Set();
@@ -1811,7 +1811,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Request a sync of the latest board state from the server
 	function requestBoardSync() {
-		console.log("Requesting board sync...");
+		//console.log("Requesting board sync...");
 		socket.emit("requestBoardSync", { roomId });
 	}
 
@@ -1826,12 +1826,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		// Set up new interval
 		syncInterval = setInterval(requestBoardSync, SYNC_INTERVAL);
-		console.log("Board sync interval set up");
+		//console.log("Board sync interval set up");
 	}
 
 	// Handle board sync received from server
 	socket.on("boardSync", ({ history }) => {
-		console.log(`Received board sync with ${history.length} history items`);
+		//console.log(`Received board sync with ${history.length} history items`);
 
 		// Only apply if we have new history items
 		if (history && history.length > 0) {

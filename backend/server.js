@@ -129,7 +129,7 @@ app.post("/api/register", async (req, res) => {
 		// Check if user already exists using findOne (more reliable than try-catch for duplicates)
 		const existingUser = await User.findOne({ email });
 		if (existingUser) {
-			console.log(`Registration attempt with existing email: ${email}`);
+			//console.log(`Registration attempt with existing email: ${email}`);
 			return res
 				.status(409)
 				.json({ error: "This email is already registered. Please try logging in instead." });
@@ -332,7 +332,7 @@ function generateSixDigitCode(roomId) {
 app.get("/api/boards/code/:code", async (req, res) => {
 	try {
 		const { code } = req.params;
-		console.log(`Looking for board with code: ${code}`);
+		//console.log(`Looking for board with code: ${code}`);
 
 		if (!code || !/^\d{6}$/.test(code)) {
 			console.log("Invalid board code format");
@@ -341,22 +341,22 @@ app.get("/api/boards/code/:code", async (req, res) => {
 
 		// Get all boards (ideally you would have a more efficient lookup)
 		const boards = await Board.find({});
-		console.log(`Found ${boards.length} boards to check against code ${code}`);
+		//console.log(`Found ${boards.length} boards to check against code ${code}`);
 
 		if (boards.length === 0) {
-			console.log("No boards exist in the database");
+			//console.log("No boards exist in the database");
 			return res.status(404).json({ error: "No boards found in the system" });
 		}
 
 		// Find the board with the matching code
 		// We'll compute the 6-digit code for each board and check for a match
-		console.log("Checking each board for matching code:");
+		//console.log("Checking each board for matching code:");
 		let validBoardsCount = 0;
 
 		for (const board of boards) {
 			// Skip boards with missing roomId
 			if (!board.roomId) {
-				console.log(`Skipping board with id ${board._id} - missing roomId`);
+				//console.log(`Skipping board with id ${board._id} - missing roomId`);
 				continue;
 			}
 
@@ -365,11 +365,11 @@ app.get("/api/boards/code/:code", async (req, res) => {
 			try {
 				// Use the utility function to generate code
 				const boardCode = generateSixDigitCode(board.roomId);
-				console.log(`Board "${board.name}" (roomId: ${board.roomId}) has code: ${boardCode}`);
+				//console.log(`Board "${board.name}" (roomId: ${board.roomId}) has code: ${boardCode}`);
 
 				if (boardCode === code) {
 					// Found the matching board
-					console.log(`MATCH FOUND! Returning board with roomId: ${board.roomId}`);
+					//console.log(`MATCH FOUND! Returning board with roomId: ${board.roomId}`);
 					return res.status(200).json({
 						roomId: board.roomId,
 						name: board.name,
@@ -382,9 +382,9 @@ app.get("/api/boards/code/:code", async (req, res) => {
 		}
 
 		// If no board found with that code
-		console.log(
-			`No board found with code: ${code} after checking ${validBoardsCount} valid boards`
-		);
+		//console.log(
+		// 	`No board found with code: ${code} after checking ${validBoardsCount} valid boards`
+		// );
 		return res.status(404).json({ error: "Board not found with this code" });
 	} catch (error) {
 		console.error("Error finding board by code:", error);
@@ -409,7 +409,7 @@ io.on("connection", (socket) => {
 		if (packet.type === "ping") socket.conn.packetsFn = []; // Clear packet buffer on ping
 	});
 	// a user connected
-	console.log("A user connected:", socket.id);
+	//console.log("A user connected:", socket.id);
 
 	// Join a room
 	socket.on("joinRoom", async ({ roomId, userName, userId, password, hasLocalAuth }) => {
@@ -462,7 +462,7 @@ io.on("connection", (socket) => {
 
 			// If user exists with different socket ID, remove the old entry
 			if (existingSocketId && existingSocketId !== socket.id) {
-				console.log(`User ${userName} reconnected with new socket.`);
+				//console.log(`User ${userName} reconnected with new socket.`);
 				delete rooms[roomId].users[existingSocketId];
 			}
 
@@ -492,7 +492,7 @@ io.on("connection", (socket) => {
 			});
 
 			if (!board) {
-				console.log(`Creating new board for room ${roomId}`);
+				//console.log(`Creating new board for room ${roomId}`);
 				board = new Board({
 					roomId,
 					name: roomId, // Default name is the roomId
@@ -516,7 +516,7 @@ io.on("connection", (socket) => {
 			io.to(roomId).emit("userJoined", rooms[roomId].users[socketId]);
 			io.to(roomId).emit("userCount", Object.keys(rooms[roomId].users).length);
 			
-			console.log(`User ${userName} joined board "${roomName}"`);
+			//console.log(`User ${userName} joined board "${roomName}"`);
 		} catch (error) {
 			console.error("Error joining room:", error);
 			socket.emit("error", { message: "Error joining room" });
@@ -647,20 +647,35 @@ io.on("connection", (socket) => {
 				const isOwner = !!(userId && boardInfo.createdBy === userId);
 				socket.emit("userRights", { isOwner });
 			} else {
-				console.log(`Board not found for roomId: ${roomId}`);
+				//console.log(`Board not found for roomId: ${roomId}`);
 			}
 		} catch (error) {
 			console.error("Error in userReady:", error);
 		}
 	});
 
-	// Handle drawing events
+	// Handle drawing events with image support
 	socket.on("drawEvent", async (data) => {
 		const roomId = socket.roomId;
 
-		// Add timestamp if not present to ensure proper ordering
+		// Add timestamp if not present
 		if (!data.timestamp) {
 			data.timestamp = Date.now();
+		}
+
+		// Handle image data optimization
+		if (data.tool === 'image') {
+			// Compress image data if it's too large
+			if (data.imageData.length > 1000000) { // If larger than 1MB
+				try {
+					// Keep the image data as is, but log the size
+					//console.log(`Large image uploaded (${Math.round(data.imageData.length / 1024)}KB)`);
+				} catch (error) {
+					console.error('Error handling image data:', error);
+					socket.emit('error', { message: 'Error processing image' });
+					return;
+				}
+			}
 		}
 
 		// Broadcast to other users in the room
@@ -675,7 +690,7 @@ io.on("connection", (socket) => {
 						$push: { history: data },
 						$set: { updatedAt: Date.now() },
 					},
-					{ new: true } // Return the updated document
+					{ new: true }
 				);
 			}
 		} catch (error) {
@@ -704,7 +719,7 @@ io.on("connection", (socket) => {
 					}
 				);
 				const userName = rooms[roomId]?.users[socket.id]?.name || "Unknown User";
-				console.log(`User ${userName} cleared board`);
+				//console.log(`User ${userName} cleared board`);
 			} catch (error) {
 				console.error("Error clearing board history:", error);
 			}
@@ -745,7 +760,7 @@ io.on("connection", (socket) => {
 				const isOwner = !!(userId && board.createdBy === userId);
 				socket.emit("userRights", { isOwner });
 			} else {
-				console.log(`Board not found for ownership check: ${roomId}`);
+				//console.log(`Board not found for ownership check: ${roomId}`);
 				socket.emit("userRights", { isOwner: false });
 			}
 		} catch (err) {
@@ -760,7 +775,7 @@ io.on("connection", (socket) => {
 		if (!roomId || !rooms[roomId] || !rooms[roomId].users) return;
 		
 		const userName = rooms[roomId]?.users[socket.id]?.name || "Unknown User";
-		console.log(`User ${userName} disconnected`);
+		//console.log(`User ${userName} disconnected`);
 
 		// Get user info before removing
 		const userInfo = rooms[roomId].users[socket.id];
@@ -790,9 +805,9 @@ io.on("connection", (socket) => {
 			try {
 				const board = await Board.findOne({ roomId });
 				const roomName = board ? board.name : roomId;
-				console.log(`Board "${roomName}" is now empty`);
+				//console.log(`Board "${roomName}" is now empty`);
 			} catch (error) {
-				console.log(`Room ${roomId} is now empty`);
+				//console.log(`Room ${roomId} is now empty`);
 			}
 		}
 	});
@@ -847,7 +862,7 @@ const createTestUser = async () => {
 				password: testPassword,
 			});
 			await user.save();
-			console.log("Test user created:", testEmail);
+			//console.log("Test user created:", testEmail);
 		}
 	} catch (error) {
 		console.error("Error creating test user:", error);
@@ -906,10 +921,10 @@ function findAndKillProcessOnPort(port) {
 			// Now kill each unique PID
 			let success = false;
 			for (const pid of pids) {
-				console.log(`Attempting to kill process ${pid}...`);
+				//console.log(`Attempting to kill process ${pid}...`);
 				try {
 					execSync(`taskkill /F /PID ${pid}`);
-					console.log(`Successfully killed process ${pid}`);
+					//console.log(`Successfully killed process ${pid}`);
 					success = true;
 				} catch (killError) {
 					console.warn(`Process ${pid} already terminated: ${killError.message}`);
@@ -946,7 +961,7 @@ async function startServer() {
 			// For Mac/Linux
 			try {
 				require("child_process").execSync(`lsof -i :${PORT} -t | xargs kill -9`);
-				console.log(`Process using port ${PORT} was terminated`);
+				//console.log(`Process using port ${PORT} was terminated`);
 			} catch (error) {
 				console.warn(`Could not kill process on port ${PORT}: ${error.message}`);
 			}
@@ -967,7 +982,7 @@ async function startServer() {
 
 	// Start the server
 	server.listen(PORT, () => {
-		console.log(`Server running on port ${PORT}`);
+		//console.log(`Server running on port ${PORT}`);
 	});
 
 	// Handle any errors that might still occur
