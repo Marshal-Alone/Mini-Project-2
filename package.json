@@ -3,8 +3,8 @@
 	"version": "1.0.0",
 	"description": "Collaborative whiteboard application",
 	"scripts": {
-		"start": "node scripts/killPort.js 5050 && set NODE_OPTIONS=--no-deprecation && cd backend && node server.js",
-		"dev": "node scripts/killPort.js 5050 && set NODE_OPTIONS=--no-deprecation && cd backend && nodemon server.js",
+		"start": "set NODE_OPTIONS=--no-deprecation && cd backend && node server.js",
+		"dev": "set NODE_OPTIONS=--no-deprecation && cd backend && nodemon server.js",
 		"kill-port": "node ./scripts/killPort.js"
 	},
 	"dependencies": {

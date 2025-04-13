@@ -837,23 +837,138 @@ const createTestUser = async () => {
 };
 
 // Start server on port 5050
-const PORT = 5050;
+// const PORT = 5050;
 
-// Import the portUtils module
-const { killProcessOnPort } = require('./utils/portUtils');
+// Start server
+const PORT = process.env.PORT || 5050;
 
-// Start the server after ensuring the port is free
-(async () => {
-	try {
-		// Try to kill any process that might be using the port
-		await killProcessOnPort(PORT);
-		
-		// Start the server
-		server.listen(PORT, () => {
-			console.log(`Server running on http://localhost:${PORT}`);
+// Function to check if port is in use
+function isPortInUse(port) {
+	return new Promise((resolve) => {
+		const net = require("net");
+		const server = net.createServer();
+
+		server.once("error", (err) => {
+			if (err.code === "EADDRINUSE") {
+				resolve(true);
+			} else {
+				resolve(false);
+			}
+			server.close();
 		});
-	} catch (error) {
-		console.error(`Failed to start server on port ${PORT}:`, error);
+
+		server.once("listening", () => {
+			server.close();
+			resolve(false);
+		});
+
+		server.listen(port);
+	});
+}
+
+// Function to find and kill process using a specific port on Windows
+function findAndKillProcessOnPort(port) {
+	return new Promise((resolve) => {
+		try {
+			// Use execSync for synchronous execution
+			const { execSync } = require("child_process");
+
+			// Get all PIDs in one go
+			const stdout = execSync(`netstat -ano | findstr :${port} | findstr LISTENING`).toString();
+
+			// Extract unique PIDs first
+			const pids = new Set();
+			const lines = stdout.trim().split("\n");
+
+			for (const line of lines) {
+				const parts = line.trim().split(/\s+/);
+				const pid = parts[parts.length - 1];
+				if (pid && !isNaN(parseInt(pid))) {
+					pids.add(pid);
+				}
+			}
+
+			// Now kill each unique PID
+			let success = false;
+			for (const pid of pids) {
+				console.log(`Attempting to kill process ${pid}...`);
+				try {
+					execSync(`taskkill /F /PID ${pid}`);
+					console.log(`Successfully killed process ${pid}`);
+					success = true;
+				} catch (killError) {
+					console.warn(`Process ${pid} already terminated: ${killError.message}`);
+				}
+			}
+
+			resolve(success);
+		} catch (error) {
+			if (error.message.includes("Command failed")) {
+				console.warn("No processes found using port", port);
+			} else {
+				console.warn("Error:", error.message);
+			}
+			resolve(false);
+		}
+	});
+}
+
+// Start server with port checking - improved version
+async function startServer() {
+	let inUse = await isPortInUse(PORT);
+	let attempts = 0;
+	const maxAttempts = 3;
+
+	while (inUse && attempts < maxAttempts) {
+		attempts++;
+		console.log(
+			`Port ${PORT} is already in use. Attempting to kill the process... (Attempt ${attempts}/${maxAttempts})`
+		);
+
+		if (process.platform === "win32") {
+			await findAndKillProcessOnPort(PORT);
+		} else {
+			// For Mac/Linux
+			try {
+				require("child_process").execSync(`lsof -i :${PORT} -t | xargs kill -9`);
+				console.log(`Process using port ${PORT} was terminated`);
+			} catch (error) {
+				console.warn(`Could not kill process on port ${PORT}: ${error.message}`);
+			}
+		}
+
+		// Wait for the port to be released
+		await new Promise((resolve) => setTimeout(resolve, 2000));
+
+		// Check again if the port is still in use
+		inUse = await isPortInUse(PORT);
+	}
+
+	if (inUse) {
+		console.error(`Port ${PORT} is still in use after ${maxAttempts} attempts.`);
+		console.error(`Please manually close the application using port ${PORT} and try again.`);
 		process.exit(1);
 	}
-})();
+
+	// Start the server
+	server.listen(PORT, () => {
+		console.log(`Server running on port ${PORT}`);
+		console.log("Performance optimizations enabled:");
+		console.log("- WebSocket ping interval: 25s");
+		console.log("- Event throttling: 100 events/second");
+		console.log("- Room cleanup: every 5 minutes");
+		console.log("- Inactive room timeout: 30 minutes");
+	});
+
+	// Handle any errors that might still occur
+	server.on("error", (e) => {
+		if (e.code === "EADDRINUSE") {
+			console.error(`Failed to bind to port ${PORT}. The port is still in use.`);
+			process.exit(1);
+		} else {
+			console.error("Server error:", e);
+		}
+	});
+}
+
+startServer();
