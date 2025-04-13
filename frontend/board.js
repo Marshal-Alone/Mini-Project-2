@@ -621,8 +621,27 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Handle clear canvas event
 	socket.on("clearCanvas", () => {
+		// Clear the main canvas
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
+		
+		// Clear the buffer canvas if it exists
+		if (typeof bufferCtx !== 'undefined') {
+			bufferCtx.clearRect(0, 0, canvas.width, canvas.height);
+		}
+		
+		// Clear all history
+		history.length = 0;
+		historyIndex = -1;
+		
+		// Save the blank state
 		saveState();
+		
+		// Update undo/redo buttons
+		document.getElementById("undoBtn").disabled = true;
+		document.getElementById("redoBtn").disabled = true;
+		
+		// Show notification
+		showToast("Board cleared", "info");
 	});
 
 	// Add event listeners for drawing
@@ -910,11 +929,30 @@ document.addEventListener("DOMContentLoaded", function () {
 	// Clear button
 	document.getElementById("clearBtn").addEventListener("click", () => {
 		if (confirm("Are you sure you want to clear the entire board?")) {
+			// Clear the canvas
 			ctx.clearRect(0, 0, canvas.width, canvas.height);
+			
+			// Clear the buffer canvas if it exists
+			if (typeof bufferCtx !== 'undefined') {
+				bufferCtx.clearRect(0, 0, canvas.width, canvas.height);
+			}
+			
+			// Clear all history
+			history.length = 0;
+			historyIndex = -1;
+			
+			// Save the blank state
 			saveState();
 
-			// Emit clear event
-			socket.emit("clearCanvas");
+			// Emit clear event with timestamp
+			socket.emit("clearCanvas", {
+				roomId,
+				timestamp: Date.now()
+			});
+			
+			// Update undo/redo buttons
+			document.getElementById("undoBtn").disabled = true;
+			document.getElementById("redoBtn").disabled = true;
 		}
 	});
 
