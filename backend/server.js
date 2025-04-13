@@ -311,37 +311,47 @@ app.get("/api/boards/code/:code", async (req, res) => {
 			return res.status(400).json({ error: "Invalid board code format. Must be 6 digits." });
 		}
 
-		// Get all boards (ideally you would have a more efficient lookup)
-		const boards = await Board.find({});
-		//console.log(`Found ${boards.length} boards to check against code ${code}`);
+		// Optimized approach: Use an in-memory cache for codes
+		if (!global.boardCodeCache) {
+			global.boardCodeCache = new Map();
+		}
+
+		// Check if code is in cache
+		if (global.boardCodeCache.has(code)) {
+			const cachedBoard = global.boardCodeCache.get(code);
+			// Verify board still exists and hasn't changed
+			const board = await Board.findOne({ roomId: cachedBoard.roomId });
+			if (board) {
+				return res.status(200).json({
+					roomId: board.roomId,
+					name: board.name,
+				});
+			} else {
+				// Board was deleted, remove from cache
+				global.boardCodeCache.delete(code);
+			}
+		}
+
+		// Optimization: Query only necessary fields and limit the result set
+		const boards = await Board.find({}, { roomId: 1, name: 1 }).limit(1000);
 
 		if (boards.length === 0) {
-			//console.log("No boards exist in the database");
 			return res.status(404).json({ error: "No boards found in the system" });
 		}
 
-		// Find the board with the matching code
-		// We'll compute the 6-digit code for each board and check for a match
-		//console.log("Checking each board for matching code:");
-		let validBoardsCount = 0;
-
+		// Build or refresh cache while searching
 		for (const board of boards) {
-			// Skip boards with missing roomId
-			if (!board.roomId) {
-				//console.log(`Skipping board with id ${board._id} - missing roomId`);
-				continue;
-			}
-
-			validBoardsCount++;
+			if (!board.roomId) continue;
 
 			try {
-				// Use the utility function to generate code
 				const boardCode = generateSixDigitCode(board.roomId);
-				//console.log(`Board "${board.name}" (roomId: ${board.roomId}) has code: ${boardCode}`);
+				// Add to cache
+				global.boardCodeCache.set(boardCode, {
+					roomId: board.roomId,
+					name: board.name
+				});
 
 				if (boardCode === code) {
-					// Found the matching board
-					//console.log(`MATCH FOUND! Returning board with roomId: ${board.roomId}`);
 					return res.status(200).json({
 						roomId: board.roomId,
 						name: board.name,
@@ -349,20 +359,49 @@ app.get("/api/boards/code/:code", async (req, res) => {
 				}
 			} catch (err) {
 				console.error(`Error generating code for board ${board._id}:`, err);
-				// Continue to next board
 			}
 		}
 
-		// If no board found with that code
-		//console.log(
-		// 	`No board found with code: ${code} after checking ${validBoardsCount} valid boards`
-		// );
 		return res.status(404).json({ error: "Board not found with this code" });
 	} catch (error) {
 		console.error("Error finding board by code:", error);
 		res.status(500).json({ error: "Server error" });
 	}
 });
+
+// Add a function to periodically refresh the code cache
+function refreshBoardCodeCache() {
+	setTimeout(async () => {
+		try {
+			// Clear existing cache
+			global.boardCodeCache = new Map();
+			
+			// Rebuild cache
+			const boards = await Board.find({}, { roomId: 1, name: 1 });
+			for (const board of boards) {
+				if (!board.roomId) continue;
+				try {
+					const boardCode = generateSixDigitCode(board.roomId);
+					global.boardCodeCache.set(boardCode, {
+						roomId: board.roomId,
+						name: board.name
+					});
+				} catch (err) {
+					console.error(`Cache refresh: Error generating code for board ${board._id}:`, err);
+				}
+			}
+			console.log(`Board code cache refreshed with ${global.boardCodeCache.size} entries`);
+		} catch (error) {
+			console.error("Error refreshing board code cache:", error);
+		}
+		
+		// Schedule next refresh (every 10 minutes)
+		refreshBoardCodeCache();
+	}, 10 * 60 * 1000); // 10 minutes
+}
+
+// Initialize the cache on server start
+refreshBoardCodeCache();
 
 // Socket.io connection handling
 // Socket.io optimization settings
@@ -753,13 +792,15 @@ io.on("connection", (socket) => {
 		// Notify other users with more information
 		if (userInfo) {
 			io.to(roomId).emit("userLeft", {
-				id: socket.id,
+				id: socket.id, // Always include the socket id
 				name: userInfo.name || "Unknown User",
+				userId: userInfo.userId || socket.id
 			});
 		} else {
+			// If no user info, at least send the socket ID
 			io.to(roomId).emit("userLeft", {
 				id: socket.id,
-				name: "Unknown User",
+				name: "Unknown User"
 			});
 		}
 

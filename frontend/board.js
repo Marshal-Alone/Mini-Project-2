@@ -1615,6 +1615,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		// Check if user is an object or just an ID
 		if (typeof user === "object") {
+			// Check if the id property exists before using it
+			if (user.id === undefined || user.id === null) {
+				console.warn("User object has no id property:", user);
+				return;
+			}
+			
 			removeUserFromList(user.id);
 			// Only show toast if we have a name
 			if (user.name) {
@@ -1622,10 +1628,12 @@ document.addEventListener("DOMContentLoaded", function () {
 			} else {
 				showToast("A user left the board", "info");
 			}
-		} else {
+		} else if (typeof user === "string") {
 			// Backward compatibility for older version
 			removeUserFromList(user);
 			showToast(`A user left the board`, "info");
+		} else {
+			console.warn("Invalid user format in userLeft event:", typeof user);
 		}
 	});
 
