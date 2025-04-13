@@ -36,6 +36,7 @@ mongoose
 	.then(() => {
 		console.log("");
 		console.log("Connected to MongoDB");
+		console.log("MONGODB_URI:", process.env.MONGODB_URI);
 	})
 	.catch((err) => console.error("Could not connect to MongoDB", err));
 
