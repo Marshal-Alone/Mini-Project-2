@@ -838,6 +838,22 @@ const createTestUser = async () => {
 
 // Start server on port 5050
 const PORT = 5050;
-server.listen(PORT, () => {
-	console.log(`Server running on http://localhost:${PORT}`);
-});
+
+// Import the portUtils module
+const { killProcessOnPort } = require('./utils/portUtils');
+
+// Start the server after ensuring the port is free
+(async () => {
+	try {
+		// Try to kill any process that might be using the port
+		await killProcessOnPort(PORT);
+		
+		// Start the server
+		server.listen(PORT, () => {
+			console.log(`Server running on http://localhost:${PORT}`);
+		});
+	} catch (error) {
+		console.error(`Failed to start server on port ${PORT}:`, error);
+		process.exit(1);
+	}
+})();

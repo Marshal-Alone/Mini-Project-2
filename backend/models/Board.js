@@ -20,6 +20,12 @@ const BoardSchema = new mongoose.Schema({
         width: Number,
         color: String,
         opacity: Number,
+        // For brush paths
+        points: [{
+            x: Number,
+            y: Number
+        }],
+        isFinalSegment: Boolean,
         // For shapes
         centerX: Number,
         centerY: Number,
@@ -31,7 +37,9 @@ const BoardSchema = new mongoose.Schema({
         x: Number,
         y: Number,
         // For line width
-        lineWidth: Number
+        lineWidth: Number,
+        // Timestamps for ordering
+        timestamp: Number
     }],
     createdAt: {
         type: Date,

@@ -1,0 +1,7 @@
+{
+  "events": {
+    "crash": "node ../scripts/killPort.js 5050 && echo 'Attempting to restart after killing port 5050...'"
+  },
+  "delay": "1500",
+  "ignore": ["node_modules/*"]
+} 

@@ -13,7 +13,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Socket.io setup
 	const socket = io('http://localhost:5050', {
-		transports: ['websocket', 'polling']
+		transports: ['websocket', 'polling'],
+		reconnectionAttempts: 5,
+		reconnectionDelay: 1000,
+		reconnectionDelayMax: 5000,
+		timeout: 20000
 	});
 
 	// Connection status handling
@@ -175,12 +179,21 @@ document.addEventListener("DOMContentLoaded", function () {
 		lastX = e.clientX - rect.left;
 		lastY = e.clientY - rect.top;
 
+		// Initialize brush points for the brush tool
+		if (currentTool === "brush") {
+			window.brushPoints = [];
+			window.brushPoints.push({ x: lastX, y: lastY });
+		}
+
 		// For shapes, we'll start a new path
 		if (currentTool !== "brush" && currentTool !== "pencil") {
 			ctx.beginPath();
 			ctx.moveTo(lastX, lastY);
 		}
 	}
+
+	let lastEmitTime = 0;
+	const EMIT_THROTTLE = 16; // ~60fps
 
 	function draw(e) {
 		if (!isDrawing) return;
@@ -193,7 +206,6 @@ document.addEventListener("DOMContentLoaded", function () {
 		// Check if we should save state (every 10 seconds during long drawing sessions)
 		const currentTime = Date.now();
 		if (currentTime - lastSaveTime > 10000) {
-			// 10 seconds
 			saveState();
 			lastSaveTime = currentTime;
 		}
@@ -220,8 +232,8 @@ document.addEventListener("DOMContentLoaded", function () {
 				// Add current point
 				window.brushPoints.push({ x: currentX, y: currentY });
 
-				// Keep only last 4 points for performance
-				if (window.brushPoints.length > 4) {
+				// Keep a reasonable number of points for smooth curves
+				if (window.brushPoints.length > 20) {
 					window.brushPoints.shift();
 				}
 
@@ -231,10 +243,8 @@ document.addEventListener("DOMContentLoaded", function () {
 					ctx.moveTo(lastX, lastY);
 
 					if (window.brushPoints.length === 2) {
-						// Draw line for 2 points
 						ctx.lineTo(currentX, currentY);
 					} else {
-						// Use bezier curve for smoother lines
 						let i = 0;
 						ctx.moveTo(window.brushPoints[0].x, window.brushPoints[0].y);
 
@@ -244,7 +254,6 @@ document.addEventListener("DOMContentLoaded", function () {
 							ctx.quadraticCurveTo(window.brushPoints[i].x, window.brushPoints[i].y, xc, yc);
 						}
 
-						// Curve through the last two points
 						ctx.quadraticCurveTo(
 							window.brushPoints[i].x,
 							window.brushPoints[i].y,
@@ -256,18 +265,22 @@ document.addEventListener("DOMContentLoaded", function () {
 					ctx.stroke();
 				}
 
-				// Emit draw event with curve data
-				socket.emit("drawEvent", {
-					tool: "brush",
-					startX: lastX,
-					startY: lastY,
-					endX: currentX,
-					endY: currentY,
-					points: window.brushPoints.map((p) => ({ x: p.x, y: p.y })),
-					color: currentColor,
-					width: currentWidth,
-					timestamp: Date.now(),
-				});
+				// Throttle emit events to reduce network traffic
+				const now = Date.now();
+				if (now - lastEmitTime >= EMIT_THROTTLE) {
+					socket.emit("drawEvent", {
+						tool: "brush",
+						startX: lastX,
+						startY: lastY,
+						endX: currentX,
+						endY: currentY,
+						points: window.brushPoints.map((p) => ({ x: p.x, y: p.y })),
+						color: currentColor,
+						width: currentWidth,
+						timestamp: now,
+					});
+					lastEmitTime = now;
+				}
 				break;
 
 			case "eraser":
@@ -369,16 +382,39 @@ document.addEventListener("DOMContentLoaded", function () {
 		if (!isDrawing) return;
 		isDrawing = false;
 
+		// Get current mouse position for the final event
+		const rect = canvas.getBoundingClientRect();
+		const currentX = event.clientX - rect.left;
+		const currentY = event.clientY - rect.top;
+
+		// For brush tool, ensure we emit one final event with all points
+		if (currentTool === "brush" && window.brushPoints && window.brushPoints.length > 0) {
+			// Make sure the current point is included
+			if (window.brushPoints[window.brushPoints.length - 1].x !== currentX || 
+				window.brushPoints[window.brushPoints.length - 1].y !== currentY) {
+				window.brushPoints.push({ x: currentX, y: currentY });
+			}
+			
+			// Emit final event with all collected points
+			socket.emit("drawEvent", {
+				tool: "brush",
+				startX: window.brushPoints[0].x,
+				startY: window.brushPoints[0].y,
+				endX: currentX,
+				endY: currentY,
+				points: window.brushPoints.map((p) => ({ x: p.x, y: p.y })),
+				color: currentColor,
+				width: currentWidth,
+				timestamp: Date.now(),
+				isFinalSegment: true // Flag this as the final segment
+			});
+		}
+
 		// Clear brush points
 		window.brushPoints = [];
 
 		// Save the current state
 		saveState();
-
-		// Get current mouse position
-		const rect = canvas.getBoundingClientRect();
-		const currentX = event.clientX - rect.left;
-		const currentY = event.clientY - rect.top;
 
 		// Emit shape drawing events
 		if (currentTool !== "brush" && currentTool !== "pencil") {
@@ -496,7 +532,7 @@ document.addEventListener("DOMContentLoaded", function () {
 					}
 					ctx.stroke();
 				} else {
-					// Fallback to simple line for backward compatibility
+					// Fallback to simple line for older data
 					ctx.beginPath();
 					ctx.moveTo(data.startX, data.startY);
 					ctx.lineTo(data.endX, data.endY);
@@ -1428,10 +1464,37 @@ document.addEventListener("DOMContentLoaded", function () {
 				// Handle different tools
 				switch (data.tool) {
 					case "brush":
-						ctx.beginPath();
-						ctx.moveTo(data.startX, data.startY);
-						ctx.lineTo(data.endX, data.endY);
-						ctx.stroke();
+						// Check if points data is available for smooth curve drawing
+						if (data.points && data.points.length >= 2) {
+							ctx.beginPath();
+							ctx.moveTo(data.points[0].x, data.points[0].y);
+
+							if (data.points.length === 2) {
+								ctx.lineTo(data.points[1].x, data.points[1].y);
+							} else {
+								let i = 0;
+								for (i = 1; i < data.points.length - 2; i++) {
+									const xc = (data.points[i].x + data.points[i + 1].x) / 2;
+									const yc = (data.points[i].y + data.points[i + 1].y) / 2;
+									ctx.quadraticCurveTo(data.points[i].x, data.points[i].y, xc, yc);
+								}
+
+								// Curve through the last two points
+								ctx.quadraticCurveTo(
+									data.points[i].x,
+									data.points[i].y,
+									data.points[i + 1].x,
+									data.points[i + 1].y
+								);
+							}
+							ctx.stroke();
+						} else {
+							// Fallback to simple line for older data
+							ctx.beginPath();
+							ctx.moveTo(data.startX, data.startY);
+							ctx.lineTo(data.endX, data.endY);
+							ctx.stroke();
+						}
 						break;
 
 					case "line":
@@ -1855,10 +1918,37 @@ document.addEventListener("DOMContentLoaded", function () {
 
 				switch (data.tool) {
 					case "brush":
-						ctx.beginPath();
-						ctx.moveTo(data.startX, data.startY);
-						ctx.lineTo(data.endX, data.endY);
-						ctx.stroke();
+						// Check if points data is available for smooth curve drawing
+						if (data.points && data.points.length >= 2) {
+							ctx.beginPath();
+							ctx.moveTo(data.points[0].x, data.points[0].y);
+
+							if (data.points.length === 2) {
+								ctx.lineTo(data.points[1].x, data.points[1].y);
+							} else {
+								let i = 0;
+								for (i = 1; i < data.points.length - 2; i++) {
+									const xc = (data.points[i].x + data.points[i + 1].x) / 2;
+									const yc = (data.points[i].y + data.points[i + 1].y) / 2;
+									ctx.quadraticCurveTo(data.points[i].x, data.points[i].y, xc, yc);
+								}
+
+								// Curve through the last two points
+								ctx.quadraticCurveTo(
+									data.points[i].x,
+									data.points[i].y,
+									data.points[i + 1].x,
+									data.points[i + 1].y
+								);
+							}
+							ctx.stroke();
+						} else {
+							// Fallback to simple line for older data
+							ctx.beginPath();
+							ctx.moveTo(data.startX, data.startY);
+							ctx.lineTo(data.endX, data.endY);
+							ctx.stroke();
+						}
 						break;
 					case "line":
 						ctx.beginPath();
