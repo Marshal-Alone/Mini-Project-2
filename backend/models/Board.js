@@ -9,6 +9,7 @@ const BoardSchema = new mongoose.Schema({
     },
     name: {
         type: String,
+        required: true,
         default: 'Untitled Board'
     },
     history: [{
@@ -39,6 +40,18 @@ const BoardSchema = new mongoose.Schema({
         // For line width
         lineWidth: Number,
         // Timestamps for ordering
+        timestamp: Number
+    }],
+    images: [{
+        data: String,
+        position: {
+            x: Number,
+            y: Number
+        },
+        size: {
+            width: Number,
+            height: Number
+        },
         timestamp: Number
     }],
     createdAt: {

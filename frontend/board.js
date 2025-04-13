@@ -134,6 +134,11 @@ document.addEventListener("DOMContentLoaded", function () {
 			// Enable/disable undo/redo buttons
 			document.getElementById("undoBtn").disabled = historyIndex <= 0;
 			document.getElementById("redoBtn").disabled = historyIndex >= history.length - 1;
+			
+			// Ensure images stay visible after state is saved
+			if (imageManager && imageManager.initialLoadComplete) {
+				setTimeout(() => imageManager.redrawAllImages(), 100);
+			}
 		};
 	}
 
@@ -946,8 +951,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
 			// Emit clear event with timestamp
 			socket.emit("clearCanvas", {
-				roomId,
-				timestamp: Date.now()
+			  roomId,
+			  timestamp: Date.now()
+			});
+			
+			// Delete all images from MongoDB
+			fetch(`/api/boards/${roomId}/images`, {
+				method: 'DELETE'
+			}).catch(error => {
+				console.error('Error deleting images:', error);
 			});
 			
 			// Update undo/redo buttons
@@ -2052,7 +2064,13 @@ document.addEventListener("DOMContentLoaded", function () {
 			ctx.globalAlpha = 1.0;
 			saveState();
 
-			// showToast("Board synchronized", "info");
+			// Make sure images are still visible after sync
+			if (imageManager && imageManager.initialLoadComplete) {
+				setTimeout(() => {
+					console.log('Redrawing images after board sync');
+					imageManager.redrawAllImages();
+				}, 500);
+			}
 		}
 	});
 
@@ -2116,4 +2134,658 @@ document.addEventListener("DOMContentLoaded", function () {
 		let sixDigitCode = ((numericValue % 900000) + 100000).toString();
 		return sixDigitCode;
 	}
+
+	// Add image upload button to the UI
+	const imageUploadInput = document.createElement('input');
+	imageUploadInput.type = 'file';
+	imageUploadInput.accept = 'image/*';
+	imageUploadInput.style.display = 'none';
+	document.body.appendChild(imageUploadInput);
+
+	// Add image upload button to toolbar
+	const imageUploadButton = document.createElement('button');
+	imageUploadButton.innerHTML = 'Upload Image';
+	imageUploadButton.addEventListener('click', () => {
+	  imageUploadInput.click();
+	});
+
+	// Add the button to your toolbar
+	const toolbar = document.querySelector('.toolbar');
+	toolbar.appendChild(imageUploadButton);
+
+	// Add styles for image handles
+	const style = document.createElement('style');
+	style.textContent = `
+	  .image-handle {
+		position: absolute;
+		width: 10px;
+		height: 10px;
+		background: white;
+		border: 2px solid #4CAF50;
+		border-radius: 50%;
+		cursor: pointer;
+		z-index: 1000;
+	  }
+	  
+	  .image-handle.resize {
+		cursor: nwse-resize;
+	  }
+	  
+	  .image-handle.move {
+		cursor: move;
+	  }
+	  
+	  .image-container {
+		position: absolute;
+		cursor: move;
+	  }
+	  
+	  .image-container:hover .image-handle {
+		display: block;
+	  }
+	  
+	  .image-handle {
+		display: none;
+	  }
+	  
+	  .image-container:hover .image-handle {
+		display: block;
+	  }
+	`;
+	document.head.appendChild(style);
+
+	// Image handling class
+	class ImageManager {
+	  constructor(canvas, ctx, roomId, socket) {
+		this.canvas = canvas;
+		this.ctx = ctx;
+		this.roomId = roomId;
+		this.socket = socket;
+		this.images = new Map(); // Store loaded images
+		this.imageContainers = new Map(); // Store active image containers
+		this.placedImages = new Map(); // Store images that have been placed on canvas
+		this.redrawInterval = null; // Store the redraw interval
+		this.isRedrawing = false; // Flag to prevent multiple redraws
+		this.isLoadingImages = false; // Flag to track when images are being loaded
+		this.initialLoadComplete = false; // Flag to track if initial load is complete
+
+		// Start periodic redraw with a longer interval
+		this.startPeriodicRedraw();
+		
+		// Add a listener for window resize to make sure images are redrawn
+		window.addEventListener('resize', this.handleResize.bind(this));
+		
+		// Add a listener for when the canvas might be cleared
+		this.canvas.addEventListener('clearCanvas', this.redrawAllImages.bind(this));
+		
+		// Add MutationObserver to detect DOM changes
+		this.setupMutationObserver();
+	  }
+
+	  setupMutationObserver() {
+		// Create a MutationObserver to watch for changes in the canvas
+		const observer = new MutationObserver((mutations) => {
+		  // If canvas or its parents change, redraw images
+		  this.redrawAllImages();
+		});
+		
+		// Configure the observer to watch for attribute changes and subtree changes
+		observer.observe(this.canvas.parentElement, {
+		  attributes: true,
+		  childList: true,
+		  subtree: true
+		});
+	  }
+
+	  handleResize() {
+		// Don't redraw immediately - wait for resize to finish
+		if (this.resizeTimeout) clearTimeout(this.resizeTimeout);
+		this.resizeTimeout = setTimeout(() => {
+		  this.redrawAllImages();
+		}, 500);
+	  }
+
+	  startPeriodicRedraw() {
+		// Clear any existing interval
+		if (this.redrawInterval) {
+		  clearInterval(this.redrawInterval);
+		}
+
+		// Redraw all images every 10 seconds instead of 30 seconds
+		this.redrawInterval = setInterval(() => {
+		  if (!this.isRedrawing && !this.isLoadingImages) {
+			console.log('Periodic redraw of images');
+			this.redrawAllImages();
+		  }
+		}, 10000);
+	  }
+
+	  stopPeriodicRedraw() {
+		if (this.redrawInterval) {
+		  clearInterval(this.redrawInterval);
+		  this.redrawInterval = null;
+		}
+	  }
+
+	  async redrawAllImages() {
+		if (this.isRedrawing || this.isLoadingImages) return;
+		if (this.placedImages.size === 0) return; // Don't redraw if no images
+		
+		this.isRedrawing = true;
+		console.log(`Redrawing ${this.placedImages.size} images`);
+
+		try {
+		  // Create a temporary canvas to store current drawings
+		  const tempCanvas = document.createElement('canvas');
+		  tempCanvas.width = this.canvas.width;
+		  tempCanvas.height = this.canvas.height;
+		  const tempCtx = tempCanvas.getContext('2d');
+		  tempCtx.drawImage(this.canvas, 0, 0);
+
+		  // Clear the canvas area
+		  this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+		  
+		  // Redraw all placed images
+		  let imagesDrawn = 0;
+		  for (const [imageKey, { img, position, size }] of this.placedImages.entries()) {
+			if (img && img.complete) {
+			  try {
+				this.ctx.drawImage(img, position.x, position.y, size.width, size.height);
+				imagesDrawn++;
+			  } catch (err) {
+				console.error('Error drawing image:', err);
+				
+				// If the image failed to draw, try to reload it
+				const newImg = await this.reloadImage(imageKey);
+				if (newImg) {
+				  this.placedImages.set(imageKey, { 
+					img: newImg, 
+					position, 
+					size 
+				  });
+				  this.ctx.drawImage(newImg, position.x, position.y, size.width, size.height);
+				  imagesDrawn++;
+				}
+			  }
+			}
+		  }
+		  
+		  console.log(`Successfully redrew ${imagesDrawn} images`);
+		  
+		  // Restore the drawing history on top of the images
+		  this.ctx.drawImage(tempCanvas, 0, 0);
+		  
+		  // Save state after redrawing
+		  saveState();
+		} catch (error) {
+		  console.error('Error during redraw:', error);
+		} finally {
+		  this.isRedrawing = false;
+		}
+	  }
+
+	  async reloadImage(imageDataUrl) {
+		return new Promise((resolve) => {
+		  if (!imageDataUrl) {
+			resolve(null);
+			return;
+		  }
+		  
+		  const img = new Image();
+		  img.onload = () => resolve(img);
+		  img.onerror = () => resolve(null);
+		  img.src = imageDataUrl;
+		});
+	  }
+
+	  async loadImage(file) {
+		return new Promise((resolve, reject) => {
+		  const reader = new FileReader();
+		  reader.onload = (e) => {
+			const img = new Image();
+			img.onload = () => {
+			  // Store the image in the cache
+			  this.images.set(img.src, img);
+			  resolve(img);
+			};
+			img.onerror = reject;
+			img.src = e.target.result;
+		  };
+		  reader.onerror = reject;
+		  reader.readAsDataURL(file);
+		});
+	  }
+
+	  async uploadImage(file) {
+		try {
+		  const img = await this.loadImage(file);
+		  this.createImageContainer(img);
+		} catch (error) {
+		  console.error('Error uploading image:', error);
+		  showToast('Error uploading image', 'error');
+		}
+	  }
+
+	  createImageContainer(img) {
+		const container = document.createElement('div');
+		container.className = 'image-container';
+		container.style.position = 'absolute';
+		container.style.left = '50%';
+		container.style.top = '50%';
+		container.style.transform = 'translate(-50%, -50%)';
+		container.style.zIndex = '1000';
+		
+		const imageElement = document.createElement('img');
+		imageElement.src = img.src;
+		imageElement.style.width = '200px';
+		imageElement.style.height = 'auto';
+		container.appendChild(imageElement);
+		
+		// Add resize handle
+		const resizeHandle = document.createElement('div');
+		resizeHandle.className = 'image-handle resize';
+		resizeHandle.style.right = '-5px';
+		resizeHandle.style.bottom = '-5px';
+		container.appendChild(resizeHandle);
+		
+		// Add move handle
+		const moveHandle = document.createElement('div');
+		moveHandle.className = 'image-handle move';
+		moveHandle.style.left = '50%';
+		moveHandle.style.top = '-5px';
+		moveHandle.style.transform = 'translateX(-50%)';
+		container.appendChild(moveHandle);
+		
+		document.body.appendChild(container);
+		this.imageContainers.set(img.src, { container, img, resizeHandle, moveHandle });
+		
+		this.setupImageHandlers(container, img, resizeHandle, moveHandle);
+	  }
+
+	  setupImageHandlers(container, img, resizeHandle, moveHandle) {
+		let isResizing = false;
+		let isMoving = false;
+		let startX, startY, startWidth, startHeight;
+		let startMoveX, startMoveY, startLeft, startTop;
+		
+		const imageElement = container.querySelector('img');
+		
+		resizeHandle.addEventListener('mousedown', (e) => {
+		  isResizing = true;
+		  startX = e.clientX;
+		  startY = e.clientY;
+		  startWidth = imageElement.offsetWidth;
+		  startHeight = imageElement.offsetHeight;
+		  e.preventDefault();
+		});
+		
+		moveHandle.addEventListener('mousedown', (e) => {
+		  isMoving = true;
+		  startMoveX = e.clientX;
+		  startMoveY = e.clientY;
+		  startLeft = container.offsetLeft;
+		  startTop = container.offsetTop;
+		  e.preventDefault();
+		});
+		
+		const handleMouseMove = (e) => {
+		  if (isResizing) {
+			const width = startWidth + (e.clientX - startX);
+			const height = startHeight + (e.clientY - startY);
+			imageElement.style.width = width + 'px';
+			imageElement.style.height = 'auto';
+		  }
+		  
+		  if (isMoving) {
+			const left = startLeft + (e.clientX - startMoveX);
+			const top = startTop + (e.clientY - startMoveY);
+			container.style.left = left + 'px';
+			container.style.top = top + 'px';
+		  }
+		};
+		
+		const handleMouseUp = () => {
+		  if (isResizing || isMoving) {
+			const rect = container.getBoundingClientRect();
+			const canvasRect = this.canvas.getBoundingClientRect();
+			
+			const position = {
+			  x: rect.left - canvasRect.left,
+			  y: rect.top - canvasRect.top
+			};
+			
+			const size = {
+			  width: imageElement.offsetWidth,
+			  height: imageElement.offsetHeight
+			};
+			
+			// Store the placed image
+			this.placedImages.set(img.src, { img, position, size });
+			
+			// Draw on canvas
+			this.ctx.drawImage(
+			  img,
+			  position.x,
+			  position.y,
+			  size.width,
+			  size.height
+			);
+			
+			// Save state
+			saveState();
+			
+			// Store image in database
+			this.saveImageToDatabase(img.src, position, size);
+			
+			// Emit event
+			this.socket.emit('drawEvent', {
+			  tool: 'image',
+			  imageData: img.src,
+			  position,
+			  size,
+			  roomId: this.roomId,
+			  timestamp: Date.now()
+			});
+			
+			// Keep the container visible but disable interaction
+			container.style.pointerEvents = 'none';
+			container.style.opacity = '0.5';
+		  }
+		  
+		  isResizing = false;
+		  isMoving = false;
+		  document.removeEventListener('mousemove', handleMouseMove);
+		  document.removeEventListener('mouseup', handleMouseUp);
+		};
+		
+		document.addEventListener('mousemove', handleMouseMove);
+		document.addEventListener('mouseup', handleMouseUp);
+	  }
+
+	  async saveImageToDatabase(imageData, position, size) {
+		try {
+		  const response = await fetch(`/api/boards/${this.roomId}/images`, {
+			method: 'POST',
+			headers: {
+			  'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({
+			  imageData: imageData,  // Changed from data to imageData
+			  position,
+			  size,
+			  timestamp: Date.now()
+			})
+		  });
+		  
+		  if (!response.ok) {
+			throw new Error('Failed to save image');
+		  }
+		} catch (error) {
+		  console.error('Error saving image to database:', error);
+		  showToast('Error saving image', 'error');
+		}
+	  }
+
+	  async loadImagesFromDatabase() {
+		if (this.isLoadingImages) return;
+		this.isLoadingImages = true;
+		
+		try {
+		  if (!this.roomId) {
+			console.error('Room ID is not defined');
+			return;
+		  }
+
+		  console.log('Loading images from database for room:', this.roomId);
+		  const response = await fetch(`/api/boards/${this.roomId}/images`, {
+			method: 'GET',
+			headers: {
+			  'Content-Type': 'application/json'
+			}
+		  });
+
+		  if (!response.ok) {
+			throw new Error(`Failed to load images: ${response.status} ${response.statusText}`);
+		  }
+
+		  const data = await response.json();
+		  
+		  if (!data || !data.images || data.images.length === 0) {
+			console.warn('No images found in response');
+			return;
+		  }
+
+		  console.log(`Found ${data.images.length} images to load`);
+		  
+		  // Clear the placedImages map to ensure we start fresh
+		  this.placedImages.clear();
+		  
+		  // Create a temporary canvas to store current drawings
+		  const tempCanvas = document.createElement('canvas');
+		  tempCanvas.width = this.canvas.width;
+		  tempCanvas.height = this.canvas.height;
+		  const tempCtx = tempCanvas.getContext('2d');
+		  tempCtx.drawImage(this.canvas, 0, 0);
+		  
+		  // Clear the canvas area
+		  this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+		  
+		  // Load and draw all images
+		  let loadedImagesCount = 0;
+		  for (const image of data.images) {
+			// Handle both old and new data structures
+			const imageData = image.imageData || image.data;
+			const position = image.position;
+			const size = image.size;
+
+			if (!imageData || !position || !size) {
+			  console.warn('Invalid image data:', image);
+			  continue;
+			}
+
+			try {
+			  const img = await this.loadImageFromData(imageData);
+			  if (img && img.complete) {
+				this.placedImages.set(imageData, {
+				  img,
+				  position,
+				  size
+				});
+				
+				this.ctx.drawImage(
+				  img,
+				  position.x,
+				  position.y,
+				  size.width,
+				  size.height
+				);
+				loadedImagesCount++;
+			  }
+			} catch (error) {
+			  console.error('Error loading individual image:', error);
+			  continue;
+			}
+		  }
+		  
+		  console.log(`Successfully loaded and drew ${loadedImagesCount} images`);
+		  
+		  // Restore the drawing history on top of the images
+		  this.ctx.drawImage(tempCanvas, 0, 0);
+		  
+		  // Save state after all images are drawn
+		  saveState();
+		  this.initialLoadComplete = true;
+		  
+		  // Schedule another redraw after a short delay to ensure images are visible
+		  setTimeout(() => this.redrawAllImages(), 2000);
+		} catch (error) {
+		  console.error('Error loading images:', error);
+		  showToast('Error loading images: ' + error.message, 'error');
+		} finally {
+		  this.isLoadingImages = false;
+		}
+	  }
+
+	  loadImageFromData(data) {
+		return new Promise((resolve, reject) => {
+		  if (this.images.has(data)) {
+				resolve(this.images.get(data));
+				return;
+		  }
+		  
+		  const img = new Image();
+		  img.crossOrigin = "Anonymous"; // Try to avoid CORS issues
+		  
+		  img.onload = () => {
+			this.images.set(data, img);
+			resolve(img);
+		  };
+		  
+		  img.onerror = (e) => {
+			console.error('Image loading error:', e);
+			reject(new Error('Failed to load image'));
+		  };
+		  
+		  img.src = data;
+		});
+	  }
+
+	  clearImages() {
+		this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+		this.images.clear();
+		this.imageContainers.forEach(({ container }) => container.remove());
+		this.imageContainers.clear();
+		this.placedImages.clear();
+	  }
+	}
+
+	// Initialize image manager
+	const imageManager = new ImageManager(canvas, ctx, roomId, socket);
+
+	// Add window load event to ensure images are drawn after the page fully loads
+	window.addEventListener('load', function() {
+		// Wait a bit after load to ensure everything is initialized
+		setTimeout(() => {
+			console.log('Redrawing images after window load');
+			imageManager.loadImagesFromDatabase().then(() => {
+				imageManager.redrawAllImages();
+			}).catch(error => {
+				console.error('Error loading images after window load:', error);
+			});
+		}, 1000);
+	});
+
+	// Update image upload handler
+	imageUploadInput.addEventListener('change', async (event) => {
+	  const file = event.target.files[0];
+	  if (!file) return;
+	  
+	  await imageManager.uploadImage(file);
+	});
+
+	// Update clear button handler
+	document.getElementById("clearBtn").addEventListener("click", async () => {
+	  if (confirm("Are you sure you want to clear the entire board?")) {
+		// Clear the canvas
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+		
+		// Clear the buffer canvas if it exists
+		if (typeof bufferCtx !== 'undefined') {
+		  bufferCtx.clearRect(0, 0, canvas.width, canvas.height);
+		}
+		
+		// Clear all history
+		history.length = 0;
+		historyIndex = -1;
+		
+		// Clear all images
+		imageManager.clearImages();
+		
+		// Save the blank state
+		saveState();
+
+		// Emit clear event with timestamp
+		socket.emit("clearCanvas", {
+		  roomId,
+		  timestamp: Date.now()
+		});
+		
+		// Delete all images from MongoDB
+		try {
+		  await fetch(`/api/boards/${roomId}/images`, {
+			method: 'DELETE'
+		  });
+		} catch (error) {
+		  console.error('Error deleting images:', error);
+		}
+		
+		// Update undo/redo buttons
+		document.getElementById("undoBtn").disabled = true;
+		document.getElementById("redoBtn").disabled = true;
+	  }
+	});
+
+	// Load images when joining a room
+	socket.on('connect', () => {
+	  if (roomId) {
+		imageManager.loadImagesFromDatabase().catch(error => {
+		  console.error('Error loading images on connect:', error);
+		});
+	  }
+	});
+
+	// Listen for the roomData event - also load images when receiving room data
+	socket.on('roomData', () => {
+	  // Load images after the room data is received
+	  setTimeout(() => {
+		imageManager.loadImagesFromDatabase().catch(error => {
+		  console.error('Error loading images after roomData:', error);
+		});
+	  }, 1000); // Delay by 1 second to allow other processing to complete
+	});
+
+	// Handle image draw event
+	socket.on('drawEvent', async (data) => {
+	  if (data.tool === 'image') {
+		const imageData = data.imageData || data.data;
+		const img = await imageManager.loadImageFromData(imageData);
+		// Store the image in placedImages map
+		imageManager.placedImages.set(imageData, {
+		  img, 
+		  position: data.position,
+		  size: data.size
+		});
+		ctx.drawImage(
+		  img,
+		  data.position.x,
+		  data.position.y,
+		  data.size.width,
+		  data.size.height
+		);
+		saveState();
+	  }
+	});
+
+	// Add an event listener for page visibility changes
+	document.addEventListener('visibilitychange', () => {
+	  if (document.visibilityState === 'visible') {
+		// Page is now visible, redraw images
+		console.log('Page now visible, redrawing images');
+		setTimeout(() => {
+		  imageManager.redrawAllImages();
+		}, 1000);
+	  }
+	});
+
+	// Override the clearRect method to ensure images are redrawn
+	const originalClearRect = ctx.clearRect;
+	ctx.clearRect = function() {
+		originalClearRect.apply(ctx, arguments);
+		// Don't redraw during image loading to avoid infinite loops
+		if (imageManager && !imageManager.isLoadingImages) {
+			setTimeout(() => imageManager.redrawAllImages(), 100);
+		}
+	};
+
+	// ... rest of existing code ...
 });

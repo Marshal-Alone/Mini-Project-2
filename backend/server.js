@@ -671,16 +671,23 @@ io.on("connection", (socket) => {
 
 		// Handle image data optimization
 		if (data.tool === 'image') {
-			// Compress image data if it's too large
-			if (data.imageData.length > 1000000) { // If larger than 1MB
-				try {
-					// Keep the image data as is, but log the size
-					//console.log(`Large image uploaded (${Math.round(data.imageData.length / 1024)}KB)`);
-				} catch (error) {
-					console.error('Error handling image data:', error);
-					socket.emit('error', { message: 'Error processing image' });
-					return;
+			try {
+				const board = await Board.findOne({ roomId });
+				if (board) {
+					// Add the new image to the images array
+					board.images = board.images || [];
+					board.images.push({
+						data: data.imageData,
+						position: data.position || { x: 0, y: 0 },
+						size: data.size || { width: 200, height: 200 },
+						timestamp: data.timestamp
+					});
+					await board.save();
 				}
+			} catch (error) {
+				console.error('Error saving image to database:', error);
+				socket.emit('error', { message: 'Error saving image' });
+				return;
 			}
 		}
 
@@ -1014,3 +1021,72 @@ async function startServer() {
 }
 
 startServer();
+
+// Add this new route to fetch images for a room
+app.get("/api/boards/:roomId/images", async (req, res) => {
+	try {
+		const { roomId } = req.params;
+		const board = await Board.findOne({ roomId }).select('images');
+		if (board && board.images) {
+			res.status(200).json({ images: board.images });
+		} else {
+			res.status(404).json({ error: "No images found for this board" });
+		}
+	} catch (error) {
+		console.error("Error fetching images:", error);
+		res.status(500).json({ error: "Server error" });
+	}
+});
+
+// Add this new route to save images for a room
+app.post("/api/boards/:roomId/images", async (req, res) => {
+	try {
+		const { roomId } = req.params;
+		const { imageData, position, size, timestamp } = req.body;
+
+		if (!imageData || !position || !size) {
+			return res.status(400).json({ error: "Missing required image data" });
+		}
+
+		const board = await Board.findOne({ roomId });
+		if (!board) {
+			return res.status(404).json({ error: "Board not found" });
+		}
+
+		// Add the new image to the images array
+		board.images = board.images || [];
+		board.images.push({
+			data: imageData,
+			position,
+			size,
+			timestamp: timestamp || Date.now()
+		});
+
+		await board.save();
+		res.status(200).json({ message: "Image saved successfully" });
+	} catch (error) {
+		console.error("Error saving image:", error);
+		res.status(500).json({ error: "Server error" });
+	}
+});
+
+// Add this new route to delete all images from a room
+app.delete("/api/boards/:roomId/images", async (req, res) => {
+	try {
+		const { roomId } = req.params;
+		const board = await Board.findOne({ roomId });
+		
+		if (!board) {
+			return res.status(404).json({ error: "Board not found" });
+		}
+
+		// Clear the images array
+		board.images = [];
+		await board.save();
+		
+		res.status(200).json({ message: "Images cleared successfully" });
+	} catch (error) {
+		console.error("Error clearing images:", error);
+		res.status(500).json({ error: "Server error" });
+	}
+});
