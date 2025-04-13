@@ -1,0 +1,140 @@
+# Collaborative Whiteboard Project Presentation
+
+## Slide 1: Title
+- Title: Collaborative Whiteboard Project
+- Subtitle: Real-time Collaborative Drawing Platform
+- Presenter: [Your Name]
+- Date: [Presentation Date]
+
+## Slide 2: Agenda
+1. Introduction
+2. Literature Survey
+3. Project Requirements
+4. Technology Stack
+5. Applications
+6. Conclusion
+7. References
+
+## Slide 3: Introduction
+- The Power of Digital Collaboration
+  - Modern web technologies for real-time interaction
+  - Enhanced productivity and innovation
+  - Seamless remote collaboration
+
+## Slide 4: Key Features
+- Real-Time Interaction
+  - Simultaneous drawing and annotation
+  - Instant updates across all users
+  - Collaborative environment for remote teams
+
+- Beyond Traditional Tools
+  - Interactive and intuitive interface
+  - Enhanced remote learning and brainstorming
+  - Creative design collaboration
+
+## Slide 5: Literature Survey
+1. Online Whiteboard: The Future of Tomorrow
+   - Web technologies (HTML, CSS, JavaScript)
+   - Real-time collaboration features
+   - Link: [Paper Link]
+
+2. CWcollab: Presenting Multimedia with Web-Based Context-Aware Collaboration
+   - Multimedia collaboration platform
+   - Real-time interaction with various media types
+   - Link: [PMC Link]
+
+3. Realtime Collaborative Drawing with Canvas and WebRTC
+   - HTML5 Canvas implementation
+   - Real-time drawing capabilities
+   - Link: [Article Link]
+
+## Slide 6: Project Requirements - Frontend
+- Core Technologies
+  - HTML5, CSS, JavaScript
+  - HTML5 Canvas API for drawing
+  - Custom CSS with Font Awesome icons
+  - Socket.IO client for real-time communication
+
+## Slide 7: Project Requirements - Backend
+- Server Stack
+  - Node.js runtime environment
+  - Express.js framework
+  - JWT and Express Session for authentication
+  - MongoDB with Mongoose ORM
+  - Socket.IO for real-time communication
+
+## Slide 8: Technology Stack - Frontend
+- HTML5 & CSS
+  - Responsive and interactive UI
+  - HTML5 Canvas for drawing
+  - Custom CSS for enhanced UX
+  - Font Awesome for icons
+
+## Slide 9: Technology Stack - Backend
+- Node.js & Express.js
+  - Server-side JavaScript runtime
+  - RESTful API development
+  - Concurrent connection handling
+  - Real-time data synchronization
+
+## Slide 10: Technology Stack - Database & Communication
+- MongoDB & Mongoose
+  - NoSQL database
+  - Structured data modeling
+  - Efficient data storage/retrieval
+
+- Socket.IO
+  - Real-time bidirectional communication
+  - Automatic reconnection
+  - Event-based collaboration
+
+## Slide 11: Technology Stack - Security
+- JWT & Session Management
+  - Secure user authentication
+  - Session-based state management
+  - Protected routes and features
+
+## Slide 12: Applications
+1. Education
+   - Interactive online classes
+   - Group study sessions
+   - Real-time problem-solving
+
+2. Corporate
+   - Remote brainstorming
+   - Project planning
+   - Collaborative diagramming
+
+3. Design
+   - Real-time sketching
+   - Client presentations
+   - Live feedback and modifications
+
+## Slide 13: Applications (Continued)
+4. Healthcare
+   - Telemedicine consultations
+   - Image annotation
+   - Collaborative diagnosis
+
+5. Training & Workshops
+   - Interactive sessions
+   - Live demonstrations
+   - Real-time Q&A
+
+## Slide 14: Conclusion
+- Modern web technologies for real-time collaboration
+- Seamless user experience across domains
+- Enhanced productivity in remote settings
+- Future potential for digital collaboration
+
+## Slide 15: References
+1. Fulari, A., et al. (2023). Online Whiteboard: The Future of Tomorrow
+2. Wu, H., et al. (2022). CWcollab: Presenting Multimedia with Web-Based Context-Aware Collaboration
+3. Holloway, T. Realtime Collaborative Drawing with Canvas and WebRTC
+4. Haldavanekar, S., et al. Enhancing Web-Based Meetings with WebRTC Technology
+5. Faye, P. M. D., et al. Virtual Classroom Solution with WebRTC in a Collaborative Context
+
+## Slide 16: Thank You
+- Questions?
+- Contact Information
+- Project Repository Link 
