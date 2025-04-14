@@ -194,8 +194,58 @@ document.addEventListener("DOMContentLoaded", function () {
 		}
 	}
 
+	// Set up draw event optimization
 	let lastEmitTime = 0;
 	const EMIT_THROTTLE = 16; // ~60fps
+	let drawQueue = [];
+
+	// Set up the interval for batched event sending
+	const BATCH_INTERVAL = 100; // Send batched events every 100ms
+
+	// Function to throttle and optimize draw event emissions
+	function throttledEmitDrawEvent(data) {
+		const now = Date.now();
+
+		// Only add points that have changed significantly to reduce payload size
+		if (data.points && data.points.length > 3) {
+			data.points = data.points.slice(-3); // Only send the last 3 points
+		}
+
+		// Add to queue for batched sending
+		drawQueue.push(data);
+
+		// Only emit if we're past the throttle interval
+		if (now - lastEmitTime > EMIT_THROTTLE) {
+			// For immediate feedback on crucial events, send them right away
+			if (data.isFinalSegment || data.tool !== "brush") {
+				socket.volatile.emit("drawEvent", data);
+			}
+			lastEmitTime = now;
+		}
+	}
+
+	// Set up interval to send batched events
+	setInterval(() => {
+		if (drawQueue.length > 0) {
+			// Only send the first 10 events if the queue is very large
+			const eventsToSend =
+				drawQueue.length > 10 ? [...drawQueue.slice(0, 5), ...drawQueue.slice(-5)] : drawQueue;
+
+			// If there are still many events, send them as a batch
+			if (eventsToSend.length > 1) {
+				socket.volatile.emit("batchDrawEvents", {
+					events: eventsToSend,
+					timestamp: Date.now(),
+				});
+			} else if (eventsToSend.length === 1) {
+				// Just send the single event normally
+				socket.volatile.emit("drawEvent", eventsToSend[0]);
+			}
+
+			// Clear the queue
+			drawQueue = [];
+		}
+	}, BATCH_INTERVAL);
 
 	function draw(e) {
 		if (!isDrawing) return;
@@ -267,22 +317,18 @@ document.addEventListener("DOMContentLoaded", function () {
 					ctx.stroke();
 				}
 
-				// Throttle emit events to reduce network traffic
-				const now = Date.now();
-				if (now - lastEmitTime >= EMIT_THROTTLE) {
-					socket.emit("drawEvent", {
-						tool: "brush",
-						startX: lastX,
-						startY: lastY,
-						endX: currentX,
-						endY: currentY,
-						points: window.brushPoints.map((p) => ({ x: p.x, y: p.y })),
-						color: currentColor,
-						width: currentWidth,
-						timestamp: now,
-					});
-					lastEmitTime = now;
-				}
+				// Use the throttled emit function
+				throttledEmitDrawEvent({
+					tool: "brush",
+					startX: lastX,
+					startY: lastY,
+					endX: currentX,
+					endY: currentY,
+					points: window.brushPoints.slice(-3), // Only send the last 3 points
+					color: currentColor,
+					width: currentWidth,
+					timestamp: Date.now(),
+				});
 				break;
 
 			case "eraser":
@@ -304,8 +350,8 @@ document.addEventListener("DOMContentLoaded", function () {
 				ctx.arc(currentX, currentY, eraserSize / 2, 0, Math.PI * 2, false);
 				ctx.fill();
 
-				// Emit erase event to server with full details for better synchronization
-				socket.emit("drawEvent", {
+				// Use the throttled emit function
+				throttledEmitDrawEvent({
 					tool: "eraser",
 					startX: lastX,
 					startY: lastY,
@@ -415,14 +461,15 @@ document.addEventListener("DOMContentLoaded", function () {
 				window.brushPoints.push({ x: currentX, y: currentY });
 			}
 
-			// Emit final event with all collected points
+			// Emit final event with relevant points (not all points)
+			// Send the final event immediately - this is important
 			socket.emit("drawEvent", {
 				tool: "brush",
 				startX: window.brushPoints[0].x,
 				startY: window.brushPoints[0].y,
 				endX: currentX,
 				endY: currentY,
-				points: window.brushPoints.map((p) => ({ x: p.x, y: p.y })),
+				points: window.brushPoints.slice(-5), // Send the last 5 points for smoothness
 				color: currentColor,
 				width: currentWidth,
 				timestamp: Date.now(),
@@ -3103,6 +3150,93 @@ document.addEventListener("DOMContentLoaded", function () {
 			setTimeout(() => imageManager.redrawAllImages(), 100);
 		}
 	};
+
+	// ... rest of existing code ...
+
+	// Handle received batch drawing events
+	socket.on("batchDrawEvents", (batchData) => {
+		if (batchData && batchData.events && Array.isArray(batchData.events)) {
+			// Sort events by timestamp to ensure proper order
+			const sortedEvents = batchData.events.sort((a, b) => a.timestamp - b.timestamp);
+
+			// Process each event
+			sortedEvents.forEach((data) => {
+				// Use the same logic as individual drawEvent handling
+				// Set context properties for drawing
+				ctx.lineWidth = data.width || data.lineWidth || 5; // Ensure we have a line width
+
+				// Reset context state to ensure clean drawing
+				ctx.globalCompositeOperation = "source-over";
+				ctx.globalAlpha = data.opacity !== undefined ? data.opacity : 1.0;
+
+				switch (data.tool) {
+					case "brush":
+						ctx.globalCompositeOperation = "source-over";
+						ctx.strokeStyle = data.color || "#000000";
+						ctx.lineWidth = data.width;
+						ctx.lineCap = "round";
+						ctx.lineJoin = "round";
+
+						// Draw smooth curve if points are provided
+						if (data.points && data.points.length >= 2) {
+							ctx.beginPath();
+							ctx.moveTo(data.points[0].x, data.points[0].y);
+
+							if (data.points.length === 2) {
+								ctx.lineTo(data.points[1].x, data.points[1].y);
+							} else {
+								let i = 0;
+								for (i = 1; i < data.points.length - 2; i++) {
+									const xc = (data.points[i].x + data.points[i + 1].x) / 2;
+									const yc = (data.points[i].y + data.points[i + 1].y) / 2;
+									ctx.quadraticCurveTo(data.points[i].x, data.points[i].y, xc, yc);
+								}
+
+								// Curve through the last two points
+								ctx.quadraticCurveTo(
+									data.points[i].x,
+									data.points[i].y,
+									data.points[i + 1].x,
+									data.points[i + 1].y
+								);
+							}
+							ctx.stroke();
+						} else {
+							// Fallback to simple line for older data
+							ctx.beginPath();
+							ctx.moveTo(data.startX, data.startY);
+							ctx.lineTo(data.endX, data.endY);
+							ctx.stroke();
+						}
+						break;
+					case "eraser":
+						// Handle eraser events
+						ctx.globalCompositeOperation = "destination-out";
+						ctx.beginPath();
+						ctx.lineWidth = data.width;
+						ctx.moveTo(data.startX, data.startY);
+						ctx.lineTo(data.endX, data.endY);
+						ctx.stroke();
+
+						// Also draw a circle at endpoint for spot erasing
+						ctx.beginPath();
+						ctx.arc(data.endX, data.endY, data.width / 2, 0, Math.PI * 2, false);
+						ctx.fill();
+						break;
+					// Handle other tools...
+				}
+			});
+
+			// Reset context properties
+			ctx.globalCompositeOperation = "source-over";
+			ctx.globalAlpha = 1;
+
+			// Save state occasionally to allow for undo/redo
+			if (Math.random() < 0.2) {
+				saveState();
+			}
+		}
+	});
 
 	// ... rest of existing code ...
 });

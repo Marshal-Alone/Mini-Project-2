@@ -733,6 +733,58 @@ io.on("connection", (socket) => {
 		}
 	});
 
+	// Handle batched drawing events for improved performance
+	socket.on("batchDrawEvents", async (batchData) => {
+		const roomId = socket.roomId;
+
+		if (
+			!batchData ||
+			!batchData.events ||
+			!Array.isArray(batchData.events) ||
+			batchData.events.length === 0
+		) {
+			return;
+		}
+
+		// Broadcast the batch to other users in the room
+		socket.to(roomId).emit("batchDrawEvents", batchData);
+
+		// Save to database - optimize by only saving significant events
+		try {
+			if (roomId) {
+				// Filter to keep only the important events or a subset to avoid database overload
+				// For example: Only save final segments, non-brush events, or a sampling of events
+				const significantEvents = batchData.events.filter(
+					(event) => event.isFinalSegment || event.tool !== "brush" || Math.random() < 0.2 // Only save ~20% of regular brush events
+				);
+
+				if (significantEvents.length > 0) {
+					await Board.updateOne(
+						{ roomId },
+						{
+							$push: {
+								history: {
+									$each: significantEvents,
+									$slice: -1000, // Keep last 1000 events
+								},
+							},
+							$set: { updatedAt: Date.now(), lastSync: Date.now() },
+						},
+						{ new: true }
+					);
+
+					// Update room's last sync time
+					if (rooms[roomId]) {
+						rooms[roomId].lastSync = Date.now();
+					}
+				}
+			}
+		} catch (error) {
+			console.error("Error saving batch drawing events:", error);
+			socket.emit("error", { message: "Failed to save drawing events" });
+		}
+	});
+
 	// Handle clear canvas event
 	socket.on("clearCanvas", async (data) => {
 		const roomId = socket.roomId;
