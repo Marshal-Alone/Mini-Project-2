@@ -235,7 +235,7 @@
     <!-- <div id="eraserSizeControl"></div> -->
   </div>
 
-  <div id="textSettings" class="text-settings brush-settings">
+  <div id="textSettings" class="text-settings brush-settings" style="display: none;">
     <h3>Text Settings</h3>
     <label for="textColor">Text Color:</label>
     <input type="color" id="textColor" value="#000000">
@@ -245,15 +245,18 @@
   </div>
 
   <!-- NO NEED -->
-  <div id="lineSettings" class="tool-settings brush-settings">
+  <div id="lineSettings" style="display: none;" class="tool-settings brush-settings">
     <h3>Line Settings</h3>
     <label for="lineColor">Line Color:</label>
     <input type="color" id="lineColor" value="#000000">
     <label for="lineSize">Line Size:</label>
-    <input type="range" id="lineSize" min="1" max="20" value="2">
+    <input type="range" id="lineSize" min="1" max="50" value="2" class="size-slider">
+    <div id="lineSizeIndicator" class="size-indicator-container">
+      <div class="size-indicator" style="width: 2px; height: 2px; border-radius: 50%; border: 1px solid #000; margin: 10px auto;"></div>
+    </div>
   </div>
 
-  <div id="rectangleSettings" class="tool-settings brush-settings">
+  <div id="rectangleSettings" class="tool-settings brush-settings" style="display: none;">
     <h3>Rectangle Settings</h3>
     <label for="rectangleColor">Rectangle Color:</label>
     <input type="color" id="rectangleColor" value="#000000">
@@ -261,7 +264,7 @@
     <input type="range" id="rectangleSize" min="1" max="20" value="2">
   </div>
 
-  <div id="circleSettings" class="tool-settings brush-settings">
+  <div id="circleSettings" class="tool-settings brush-settings" style="display: none;">
     <h3>Circle Settings</h3>
     <label for="circleColor">Circle Color:</label>
     <input type="color" id="circleColor" value="#000000">

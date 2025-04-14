@@ -328,7 +328,14 @@ document.addEventListener("DOMContentLoaded", function () {
 				}
 				// Use line-specific color and width if available
 				const lineColor = lineColorInput ? lineColorInput.value : currentColor;
-				const lineWidth = lineSizeSlider ? parseInt(lineSizeSlider.value) : currentWidth;
+				let lineWidth = currentWidth;
+
+				// Force get the latest slider value for the width
+				if (lineSizeSlider) {
+					lineWidth = parseInt(lineSizeSlider.value);
+					console.log("Using line width from slider:", lineWidth);
+				}
+
 				ctx.strokeStyle = lineColor;
 				ctx.lineWidth = lineWidth;
 				ctx.fillStyle = "transparent";
@@ -435,7 +442,14 @@ document.addEventListener("DOMContentLoaded", function () {
 				case "line":
 					// Use line-specific color and width if available
 					const lineColor = lineColorInput ? lineColorInput.value : currentColor;
-					const lineWidth = lineSizeSlider ? parseInt(lineSizeSlider.value) : currentWidth;
+					let lineWidth = currentWidth;
+
+					// Force get the latest slider value for the width
+					if (lineSizeSlider) {
+						lineWidth = parseInt(lineSizeSlider.value);
+						console.log("Emitting line with width:", lineWidth);
+					}
+
 					socket.emit("drawEvent", {
 						tool: "line",
 						startX: lastX,
@@ -812,12 +826,31 @@ document.addEventListener("DOMContentLoaded", function () {
 	}
 
 	if (lineSizeSlider) {
+		console.log("Line size slider found:", lineSizeSlider.id, lineSizeSlider.value);
+
+		// Update the line size indicator initially
+		const lineSizeIndicator = document.getElementById("lineSizeIndicator");
+		if (lineSizeIndicator) {
+			const initialSize = parseInt(lineSizeSlider.value);
+			lineSizeIndicator.innerHTML = `<div class="size-indicator" style="width: ${initialSize}px; height: ${initialSize}px; border-radius: 50%; border: 1px solid #000; margin: 10px auto;"></div>`;
+		}
+
 		lineSizeSlider.addEventListener("input", (e) => {
-			toolSizes.line = parseInt(e.target.value);
+			const size = parseInt(e.target.value);
+			console.log("Line size changed to:", size);
+			toolSizes.line = size;
 			if (currentTool === "line") {
-				currentWidth = toolSizes.line;
+				currentWidth = size;
+				console.log("Current width updated to:", currentWidth);
+			}
+
+			// Update the size indicator
+			if (lineSizeIndicator) {
+				lineSizeIndicator.innerHTML = `<div class="size-indicator" style="width: ${size}px; height: ${size}px; border-radius: 50%; border: 1px solid #000; margin: 10px auto;"></div>`;
 			}
 		});
+	} else {
+		console.error("Line size slider not found");
 	}
 
 	// Rectangle settings
@@ -962,7 +995,13 @@ document.addEventListener("DOMContentLoaded", function () {
 					updateEraserCursor(lastMouseEvent);
 				}
 			}
-
+			//Initially hide all settings
+			brushSettingsPopup.style.display = "none";
+			eraserSettings.style.display = "none";
+			textSettings.style.display = "none";
+			lineSettings.style.display = "none";
+			rectangleSettings.style.display = "none";
+			circleSettings.style.display = "none";
 			// Show settings for selected tool
 			switch (currentTool) {
 				case "brush":
@@ -976,11 +1015,14 @@ document.addEventListener("DOMContentLoaded", function () {
 					eraserSettings.style.display = "block";
 					break;
 				case "line":
-					lineSettings.style.display = "block";
+					// lineSettings.style.display = "block";
 					// Update line color to match current color
 					if (lineColorInput) lineColorInput.value = currentColor;
 					// Update line size to match current size
-					if (lineSizeSlider) lineSizeSlider.value = toolSizes.line;
+					if (lineSizeSlider) {
+						lineSizeSlider.value = toolSizes.line;
+						console.log("Set line slider to:", toolSizes.line);
+					}
 					break;
 				case "rectangle":
 					rectangleSettings.style.display = "block";
