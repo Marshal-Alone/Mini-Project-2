@@ -1,3 +1,6 @@
+// Suppress punycode deprecation warning
+process.removeAllListeners("warning");
+
 console.log("-------------------STARTING SERVER-------------------");
 
 require("dotenv").config();
@@ -13,8 +16,10 @@ const User = require("./models/User");
 const Board = require("./models/Board");
 const bcrypt = require("bcryptjs");
 const mongoose = require("mongoose");
+const bodyParser = require("body-parser");
+const cors = require("cors");
 
-// Connect to MongoDB
+// Connect to MongoDB with optimized settings and connection pooling
 connectDB();
 
 mongoose
@@ -22,20 +27,57 @@ mongoose
 		useNewUrlParser: true,
 		useUnifiedTopology: true,
 		retryWrites: true,
-		w: 'majority'
+		w: "majority",
+		maxPoolSize: 10,
+		socketTimeoutMS: 45000,
+		serverSelectionTimeoutMS: 30000,
+		// Connection optimization
+		keepAlive: true,
+		keepAliveInitialDelay: 300000,
 	})
 	.then(() => {
 		console.log("");
 		console.log("Connected to MongoDB");
+		console.log("MONGODB_URI:", process.env.MONGODB_URI);
 	})
 	.catch((err) => console.error("Could not connect to MongoDB", err));
 
 const app = express();
 const server = http.createServer(app);
+
+// Configure CORS
+const allowedOrigins = process.env.CORS_ORIGINS
+	? process.env.CORS_ORIGINS.split(",")
+	: [
+			"http://localhost:5050",
+			"https://collaboard-frontend.onrender.com",
+			"https://online-whiteboard-mini-project.netlify.app",
+			"https://whiteboard-frontend-7ujc.onrender.com",
+	  ];
+
+// Apply CORS middleware
+app.use(
+	cors({
+		origin: function (origin, callback) {
+			// Allow requests with no origin (like mobile apps or curl requests)
+			if (!origin) return callback(null, true);
+			if (allowedOrigins.indexOf(origin) === -1) {
+				const msg =
+					"The CORS policy for this site does not allow access from the specified Origin.";
+				return callback(new Error(msg), false);
+			}
+			return callback(null, true);
+		},
+		credentials: true,
+	})
+);
+
+// Initialize Socket.IO with CORS config
 const io = new Server(server, {
 	cors: {
-		origin: "*",
+		origin: allowedOrigins,
 		methods: ["GET", "POST"],
+		credentials: true,
 	},
 });
 
@@ -43,6 +85,12 @@ const io = new Server(server, {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+// Increase the limit for JSON payloads
+app.use(bodyParser.json({ limit: "100mb" }));
+app.use(bodyParser.urlencoded({ limit: "100mb", extended: true }));
+
+// Serve static files directly
 app.use(express.static(path.join(__dirname, "../frontend")));
 
 // Store room data
@@ -325,7 +373,7 @@ app.get("/api/boards/code/:code", async (req, res) => {
 io.engine.pingInterval = 25000; // Increased ping interval
 io.engine.pingTimeout = 60000; // Increased timeout
 io.engine.maxHttpBufferSize = 1e8; // Increased buffer size for large messages
-io.engine.transports = ['websocket']; // Force WebSocket only for better performance
+io.engine.transports = ["websocket"]; // Force WebSocket only for better performance
 
 // Configure socket middleware for performance
 io.use(async (socket, next) => {
@@ -607,16 +655,16 @@ io.on("connection", (socket) => {
 			await Board.updateOne(
 				{ roomId },
 				{
-					$push: { 
+					$push: {
 						history: {
 							$each: [data],
-							$slice: -1000 // Keep last 1000 events
-						}
+							$slice: -1000, // Keep last 1000 events
+						},
 					},
-					$set: { 
+					$set: {
 						updatedAt: Date.now(),
-						lastSync: Date.now()
-					}
+						lastSync: Date.now(),
+					},
 				}
 			);
 		} catch (error) {
@@ -639,8 +687,8 @@ io.on("connection", (socket) => {
 				{
 					$set: {
 						history: [],
-						updatedAt: Date.now()
-					}
+						updatedAt: Date.now(),
+					},
 				}
 			);
 		} catch (error) {
