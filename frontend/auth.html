@@ -5,6 +5,11 @@
     <title>Authentication - Collaboard</title>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="assets/images/favicon.ico" />
+    <link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg" />
+    <link rel="apple-touch-icon" href="assets/images/favicon.svg" />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#4285F4" />
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <style>
@@ -512,20 +517,20 @@
         const showError = (formType, message) => {
             const errorDiv = document.getElementById(`${formType}Error`);
             if (!errorDiv) return;
-            
+
             // Special handling for duplicate email errors
             if (message.includes("already registered")) {
                 // Switch to login tab
                 document.querySelectorAll('.tab-trigger').forEach(t => t.classList.remove('active'));
                 document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                
+
                 const loginTrigger = document.querySelector('[data-tab="login"]');
                 const loginContent = document.getElementById('login');
-                
+
                 if (loginTrigger && loginContent) {
                     loginTrigger.classList.add('active');
                     loginContent.classList.add('active');
-                    
+
                     // Focus the email field and copy the email value
                     const registerEmail = document.getElementById('register-email').value;
                     const loginEmail = document.getElementById('login-email');
@@ -533,14 +538,14 @@
                         loginEmail.value = registerEmail;
                         loginEmail.focus();
                     }
-                    
+
                     // Show message in login form
                     const loginError = document.getElementById('loginError');
                     if (loginError) {
                         loginError.textContent = "This email is already registered. Please log in.";
                         loginError.style.display = 'block';
                         loginError.classList.add('visible');
-                        
+
                         setTimeout(() => {
                             loginError.classList.remove('visible');
                             setTimeout(() => {
@@ -548,21 +553,21 @@
                             }, 300);
                         }, 5000);
                     }
-                    
+
                     return;
                 }
             }
-            
+
             errorDiv.textContent = message;
             errorDiv.style.display = 'block';
             errorDiv.classList.add('visible');
-            
+
             // Add shake animation effect for better visibility
             errorDiv.style.animation = 'none';
             setTimeout(() => {
                 errorDiv.style.animation = 'shake 0.5s ease-in-out';
             }, 10);
-            
+
             setTimeout(() => {
                 errorDiv.classList.remove('visible');
                 setTimeout(() => {

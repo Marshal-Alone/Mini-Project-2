@@ -1,0 +1,16 @@
+{
+	"name": "Collaboard - Collaborative Whiteboard",
+	"short_name": "Collaboard",
+	"description": "A collaborative whiteboard for real-time teamwork",
+	"start_url": "/",
+	"display": "standalone",
+	"background_color": "#ffffff",
+	"theme_color": "#4285F4",
+	"icons": [
+		{
+			"src": "assets/images/favicon.svg",
+			"sizes": "any",
+			"type": "image/svg+xml"
+		}
+	]
+}
