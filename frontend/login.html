@@ -36,22 +36,22 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         // Show error message function
         const showError = (message) => {
             const errorDiv = document.getElementById('loginError');
             if (!errorDiv) return;
-            
+
             errorDiv.textContent = message;
             errorDiv.style.display = 'block';
             errorDiv.classList.add('visible');
-            
+
             // Add shake animation for better visibility
             errorDiv.style.animation = 'none';
             setTimeout(() => {
                 errorDiv.style.animation = 'shake 0.5s ease-in-out';
             }, 10);
-            
+
             // Hide after delay
             setTimeout(() => {
                 errorDiv.classList.remove('visible');
@@ -66,16 +66,16 @@
         if (loginForm) {
             loginForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                
+
                 // Get form values
                 const email = document.getElementById('login-email').value;
                 const password = document.getElementById('login-password').value;
-                
+
                 // Update button state
                 const loginButton = document.getElementById('loginButton');
                 loginButton.disabled = true;
                 loginButton.textContent = 'Signing in...';
-                
+
                 try {
                     // Send login request
                     const response = await fetch('/api/login', {
@@ -85,9 +85,9 @@
                         },
                         body: JSON.stringify({ email, password }),
                     });
-                    
+
                     const data = await response.json();
-                    
+
                     if (response.ok) {
                         // Save user data and redirect
                         localStorage.setItem('token', data.token);
@@ -108,4 +108,4 @@
             });
         }
     });
-</script> 
+</script>

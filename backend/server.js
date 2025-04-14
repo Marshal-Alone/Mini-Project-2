@@ -1,5 +1,5 @@
 // Suppress punycode deprecation warning
-process.removeAllListeners('warning');
+process.removeAllListeners("warning");
 
 console.log("-------------------STARTING SERVER-------------------");
 
@@ -16,6 +16,7 @@ const User = require("./models/User");
 const Board = require("./models/Board");
 const bcrypt = require("bcryptjs");
 const mongoose = require("mongoose");
+const bodyParser = require("body-parser");
 
 // Connect to MongoDB with optimized settings and connection pooling
 connectDB();
@@ -25,13 +26,13 @@ mongoose
 		useNewUrlParser: true,
 		useUnifiedTopology: true,
 		retryWrites: true,
-		w: 'majority',
+		w: "majority",
 		maxPoolSize: 10,
 		socketTimeoutMS: 45000,
 		serverSelectionTimeoutMS: 30000,
 		// Connection optimization
 		keepAlive: true,
-		keepAliveInitialDelay: 300000
+		keepAliveInitialDelay: 300000,
 	})
 	.then(() => {
 		console.log("");
@@ -45,17 +46,21 @@ const server = http.createServer(app);
 
 // Initialize Socket.IO without CORS and with localhost only
 const io = new Server(server, {
-	transports: ['websocket', 'polling'],
+	transports: ["websocket", "polling"],
 	cors: {
 		origin: "http://localhost:5050",
-		methods: ["GET", "POST"]
-	}
+		methods: ["GET", "POST"],
+	},
 });
 
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+// Increase the limit for JSON payloads
+app.use(bodyParser.json({ limit: "100mb" }));
+app.use(bodyParser.urlencoded({ limit: "100mb", extended: true }));
 
 // Serve static files directly
 app.use(express.static(path.join(__dirname, "../frontend")));
@@ -219,16 +224,16 @@ app.post("/api/boards", authenticateToken, async (req, res) => {
 
 		// Generate a unique room ID
 		const roomId = uuidv4();
-		
+
 		// Create board
 		const board = await Board.create({
 			name,
 			roomId,
 			createdBy: userId,
 		});
-		
+
 		console.log(`User ${req.user.name} created new board: ${name}`);
-		
+
 		res.status(201).json({
 			message: "Board created successfully",
 			board,
@@ -243,7 +248,7 @@ app.post("/api/boards", authenticateToken, async (req, res) => {
 app.get("/api/boards", authenticateToken, async (req, res) => {
 	try {
 		const userId = req.user.id;
-		
+
 		// Get boards
 		const boards = await Board.find({ createdBy: userId });
 
@@ -262,19 +267,19 @@ app.delete("/api/boards/:roomId", authenticateToken, async (req, res) => {
 
 		// Find the board first to verify ownership
 		const board = await Board.findOne({ roomId });
-		
+
 		if (!board) {
 			return res.status(404).json({ error: "Board not found" });
 		}
-		
+
 		// Verify the user is the owner of the board
 		if (board.createdBy !== userId) {
 			return res.status(403).json({ error: "You do not have permission to delete this board" });
 		}
-		
+
 		// Delete the board
 		await Board.deleteOne({ roomId });
-		
+
 		res.status(200).json({ message: "Board deleted successfully" });
 	} catch (error) {
 		console.error("Board deletion error:", error);
@@ -349,7 +354,7 @@ app.get("/api/boards/code/:code", async (req, res) => {
 				// Add to cache
 				global.boardCodeCache.set(boardCode, {
 					roomId: board.roomId,
-					name: board.name
+					name: board.name,
 				});
 
 				if (boardCode === code) {
@@ -376,7 +381,7 @@ function refreshBoardCodeCache() {
 		try {
 			// Clear existing cache
 			global.boardCodeCache = new Map();
-			
+
 			// Rebuild cache
 			const boards = await Board.find({}, { roomId: 1, name: 1 });
 			for (const board of boards) {
@@ -385,7 +390,7 @@ function refreshBoardCodeCache() {
 					const boardCode = generateSixDigitCode(board.roomId);
 					global.boardCodeCache.set(boardCode, {
 						roomId: board.roomId,
-						name: board.name
+						name: board.name,
 					});
 				} catch (err) {
 					console.error(`Cache refresh: Error generating code for board ${board._id}:`, err);
@@ -395,7 +400,7 @@ function refreshBoardCodeCache() {
 		} catch (error) {
 			console.error("Error refreshing board code cache:", error);
 		}
-		
+
 		// Schedule next refresh (every 10 minutes)
 		refreshBoardCodeCache();
 	}, 10 * 60 * 1000); // 10 minutes
@@ -513,7 +518,7 @@ io.on("connection", (socket) => {
 				users: Object.values(rooms[roomId].users),
 				history: board.history || [],
 			});
-			
+
 			// Check and notify if user is the owner
 			const isOwner = !!(userId && board.createdBy === userId);
 			socket.emit("userRights", { isOwner });
@@ -521,7 +526,7 @@ io.on("connection", (socket) => {
 			// Notify all clients about the new user
 			io.to(roomId).emit("userJoined", rooms[roomId].users[socketId]);
 			io.to(roomId).emit("userCount", Object.keys(rooms[roomId].users).length);
-			
+
 			//console.log(`User ${userName} joined board "${roomName}"`);
 		} catch (error) {
 			console.error("Error joining room:", error);
@@ -641,11 +646,11 @@ io.on("connection", (socket) => {
 		try {
 			// Get board info from database
 			const boardInfo = await Board.findOne({ roomId });
-			
+
 			if (boardInfo) {
 				// Get user ID from the room users
 				const userId = rooms[roomId]?.users[socket.id]?.userId;
-				
+
 				// Send password status
 				socket.emit("roomPasswordStatus", boardInfo.isPasswordProtected);
 
@@ -670,7 +675,7 @@ io.on("connection", (socket) => {
 		}
 
 		// Handle image data optimization
-		if (data.tool === 'image') {
+		if (data.tool === "image") {
 			try {
 				const board = await Board.findOne({ roomId });
 				if (board) {
@@ -680,13 +685,13 @@ io.on("connection", (socket) => {
 						data: data.imageData,
 						position: data.position || { x: 0, y: 0 },
 						size: data.size || { width: 200, height: 200 },
-						timestamp: data.timestamp
+						timestamp: data.timestamp,
 					});
 					await board.save();
 				}
 			} catch (error) {
-				console.error('Error saving image to database:', error);
-				socket.emit('error', { message: 'Error saving image' });
+				console.error("Error saving image to database:", error);
+				socket.emit("error", { message: "Error saving image" });
 				return;
 			}
 		}
@@ -713,26 +718,37 @@ io.on("connection", (socket) => {
 	});
 
 	// Handle clear canvas event
-	socket.on("clearCanvas", async () => {
+	socket.on("clearCanvas", async (data) => {
 		const roomId = socket.roomId;
 
 		if (roomId) {
-			// Broadcast to all other users in the room
-			socket.to(roomId).emit("clearCanvas");
+			// Check if clearImages flag is set
+			const clearImages = data && data.clearImages === true;
 
-			// Clear history in database
+			// Broadcast to all other users in the room
+			socket.to(roomId).emit("clearCanvas", {
+				clearImages: clearImages,
+				timestamp: data?.timestamp || Date.now(),
+			});
+
+			// Clear history and images in database
 			try {
-				await Board.updateOne(
-					{ roomId },
-					{
-						$set: {
-							history: [],
-							updatedAt: Date.now(),
-						},
-					}
-				);
+				const updateOps = {
+					$set: {
+						history: [],
+						updatedAt: Date.now(),
+					},
+				};
+
+				// If clearImages flag is set, also clear images
+				if (clearImages) {
+					updateOps.$set.images = [];
+				}
+
+				await Board.updateOne({ roomId }, updateOps);
+
 				const userName = rooms[roomId]?.users[socket.id]?.name || "Unknown User";
-				//console.log(`User ${userName} cleared board`);
+				console.log(`User ${userName} cleared board${clearImages ? " including images" : ""}`);
 			} catch (error) {
 				console.error("Error clearing board history:", error);
 			}
@@ -757,17 +773,17 @@ io.on("connection", (socket) => {
 			socket.emit("error", { message: "Error syncing board" });
 		}
 	});
-	
+
 	// Add explicit ownership check handler
 	socket.on("checkOwnership", async (data) => {
 		try {
 			const { roomId } = data;
 			// Get user ID from the room users
 			const userId = rooms[roomId]?.users[socket.id]?.userId;
-			
+
 			// Fetch the board from the database
 			const board = await Board.findOne({ roomId });
-			
+
 			if (board) {
 				// Ensure we have a boolean, not undefined or null
 				const isOwner = !!(userId && board.createdBy === userId);
@@ -787,7 +803,7 @@ io.on("connection", (socket) => {
 		console.log("User disconnected:", socket.id);
 		const roomId = socket.roomId;
 		if (!roomId || !rooms[roomId] || !rooms[roomId].users) return;
-		
+
 		const userName = rooms[roomId]?.users[socket.id]?.name || "Unknown User";
 		//console.log(`User ${userName} disconnected`);
 
@@ -802,13 +818,13 @@ io.on("connection", (socket) => {
 			io.to(roomId).emit("userLeft", {
 				id: socket.id, // Always include the socket id
 				name: userInfo.name || "Unknown User",
-				userId: userInfo.userId || socket.id
+				userId: userInfo.userId || socket.id,
 			});
 		} else {
 			// If no user info, at least send the socket ID
 			io.to(roomId).emit("userLeft", {
 				id: socket.id,
-				name: "Unknown User"
+				name: "Unknown User",
 			});
 		}
 
@@ -1026,7 +1042,7 @@ startServer();
 app.get("/api/boards/:roomId/images", async (req, res) => {
 	try {
 		const { roomId } = req.params;
-		const board = await Board.findOne({ roomId }).select('images');
+		const board = await Board.findOne({ roomId }).select("images");
 		if (board && board.images) {
 			res.status(200).json({ images: board.images });
 		} else {
@@ -1059,7 +1075,7 @@ app.post("/api/boards/:roomId/images", async (req, res) => {
 			data: imageData,
 			position,
 			size,
-			timestamp: timestamp || Date.now()
+			timestamp: timestamp || Date.now(),
 		});
 
 		await board.save();
@@ -1075,7 +1091,7 @@ app.delete("/api/boards/:roomId/images", async (req, res) => {
 	try {
 		const { roomId } = req.params;
 		const board = await Board.findOne({ roomId });
-		
+
 		if (!board) {
 			return res.status(404).json({ error: "Board not found" });
 		}
@@ -1083,10 +1099,22 @@ app.delete("/api/boards/:roomId/images", async (req, res) => {
 		// Clear the images array
 		board.images = [];
 		await board.save();
-		
+
 		res.status(200).json({ message: "Images cleared successfully" });
 	} catch (error) {
 		console.error("Error clearing images:", error);
 		res.status(500).json({ error: "Server error" });
 	}
+});
+
+// Add error handling middleware
+app.use((err, req, res, next) => {
+	if (err instanceof SyntaxError && err.status === 413) {
+		return res.status(413).json({
+			error: "Request entity too large",
+			message:
+				"The uploaded file is too large. Please try with a smaller file or reduce the image quality.",
+		});
+	}
+	next(err);
 });

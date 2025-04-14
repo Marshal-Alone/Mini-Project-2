@@ -140,10 +140,10 @@
   overflow: hidden;
   position: relative;
   background-color: #f0f0f0;
-  background-image: 
-    linear-gradient(45deg, #e0e0e0 25%, transparent 25%), 
-    linear-gradient(-45deg, #e0e0e0 25%, transparent 25%), 
-    linear-gradient(45deg, transparent 75%, #e0e0e0 75%), 
+  background-image:
+    linear-gradient(45deg, #e0e0e0 25%, transparent 25%),
+    linear-gradient(-45deg, #e0e0e0 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #e0e0e0 75%),
     linear-gradient(-45deg, transparent 75%, #e0e0e0 75%);
   background-size: 20px 20px;
   background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
@@ -428,13 +428,13 @@
     flex-wrap: wrap;
     gap: 1rem;
   }
-  
+
   .tool-group {
     border-right: none;
     border-bottom: 1px solid var(--border-color);
     padding-bottom: 0.5rem;
   }
-  
+
   .users-panel {
     width: 200px;
   }
@@ -547,179 +547,191 @@
 
 /* Add modern modal styles */
 .modern-confirm-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
 }
 
 .modern-confirm-modal .modal-content {
-    background: white;
-    padding: 2rem;
-    border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-    max-width: 400px;
-    text-align: center;
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  max-width: 400px;
+  text-align: center;
 }
 
 .modern-confirm-modal h3 {
-    margin: 0 0 1rem 0;
-    color: #333;
+  margin: 0 0 1rem 0;
+  color: #333;
 }
 
 .modern-confirm-modal p {
-    margin: 0 0 2rem 0;
-    color: #666;
+  margin: 0 0 2rem 0;
+  color: #666;
 }
 
 .modal-actions {
-    display: flex;
-    gap: 1rem;
-    justify-content: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
 }
 
 .style-controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
 }
 
 .size-control {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .size-control label {
-    font-size: 0.8em;
-    color: #666;
+  font-size: 0.8em;
+  color: #666;
 }
 
 .styled-select {
-    padding: 4px 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    background-color: white;
-    font-size: 0.9em;
-    min-width: 100px;
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: white;
+  font-size: 0.9em;
+  min-width: 100px;
 }
 
 .styled-select:focus {
-    outline: none;
-    border-color: #4a90e2;
-    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+  outline: none;
+  border-color: #4a90e2;
+  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
 }
+
 .hide {
   display: none;
 }
 
 /* Image Upload Styles */
 .upload-area {
-    border: 2px dashed #ccc;
-    border-radius: 8px;
-    padding: 20px;
-    text-align: center;
-    margin-bottom: 20px;
-    min-height: 200px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
+  border: 2px dashed #ccc;
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  margin-bottom: 20px;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
 .upload-area:hover {
-    border-color: #4CAF50;
-    background-color: rgba(76, 175, 80, 0.05);
+  border-color: #4CAF50;
+  background-color: rgba(76, 175, 80, 0.05);
 }
 
 .upload-area.dragover {
-    border-color: #4CAF50;
-    background-color: rgba(76, 175, 80, 0.1);
+  border-color: #4CAF50;
+  background-color: rgba(76, 175, 80, 0.1);
 }
 
 .upload-placeholder {
-    color: #666;
+  color: #666;
 }
 
 .upload-placeholder i {
-    font-size: 48px;
-    margin-bottom: 10px;
-    color: #999;
+  font-size: 48px;
+  margin-bottom: 10px;
+  color: #999;
 }
 
 .image-options {
-    margin: 20px 0;
-    padding: 15px;
-    background: #f5f5f5;
-    border-radius: 8px;
+  margin: 20px 0;
+  padding: 15px;
+  background: #f5f5f5;
+  border-radius: 8px;
 }
 
 .image-options label {
-    display: block;
-    margin-bottom: 10px;
-    font-weight: bold;
+  display: block;
+  margin-bottom: 10px;
+  font-weight: bold;
 }
 
 .image-options input[type="range"] {
-    width: 100%;
-    margin-bottom: 5px;
+  width: 100%;
+  margin-bottom: 5px;
 }
 
 #imageSizeValue {
-    display: inline-block;
-    min-width: 40px;
-    text-align: right;
+  display: inline-block;
+  min-width: 40px;
+  text-align: right;
 }
 
 /* Image on Canvas */
 .canvas-image {
-    pointer-events: none;
-    user-select: none;
+  pointer-events: none;
+  user-select: none;
 }
 
 .image-handle {
-    position: absolute;
-    width: 10px;
-    height: 10px;
-    background: white;
-    border: 2px solid #4CAF50;
-    border-radius: 50%;
-    cursor: pointer;
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: white;
+  border: 2px solid #4CAF50;
+  border-radius: 50%;
+  cursor: pointer;
 }
 
-.image-handle.top-left { cursor: nw-resize; }
-.image-handle.top-right { cursor: ne-resize; }
-.image-handle.bottom-left { cursor: sw-resize; }
-.image-handle.bottom-right { cursor: se-resize; }
+.image-handle.top-left {
+  cursor: nw-resize;
+}
+
+.image-handle.top-right {
+  cursor: ne-resize;
+}
+
+.image-handle.bottom-left {
+  cursor: sw-resize;
+}
+
+.image-handle.bottom-right {
+  cursor: se-resize;
+}
 
 /* Image toolbar */
 .image-toolbar {
-    position: absolute;
-    background: white;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    padding: 5px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    display: none;
+  position: absolute;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 5px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  display: none;
 }
 
 .image-toolbar button {
-    padding: 5px;
-    margin: 0 2px;
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: #666;
+  padding: 5px;
+  margin: 0 2px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #666;
 }
 
 .image-toolbar button:hover {
-    color: #4CAF50;
+  color: #4CAF50;
 }

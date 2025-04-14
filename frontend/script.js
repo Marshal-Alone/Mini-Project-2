@@ -1,72 +1,74 @@
-import config from './config.js';
+import config from "./config.js";
 
 document.addEventListener("DOMContentLoaded", function () {
 	// Function to load past boards
 	const loadPastBoards = async () => {
 		const pastBoardsList = document.getElementById("pastBoardsList");
 		const noBoards = document.getElementById("noBoards");
-		
+
 		if (!pastBoardsList) return;
-		
+
 		try {
 			const token = localStorage.getItem("token");
 			if (!token) {
 				if (noBoards) noBoards.style.display = "block";
 				return;
 			}
-			
+
 			// Show loading state
 			pastBoardsList.innerHTML = '<div class="loading">Loading your boards...</div>';
-			
+
 			const response = await fetch(`${config.API_URL}/api/boards`, {
 				headers: {
-					Authorization: `Bearer ${token}`
-				}
+					Authorization: `Bearer ${token}`,
+				},
 			});
-			
+
 			if (response.ok) {
 				const data = await response.json();
 				const boards = data.boards;
-				
+
 				// Clear loading message
-				pastBoardsList.innerHTML = '';
-				
+				pastBoardsList.innerHTML = "";
+
 				if (boards.length === 0) {
 					// Show "no boards" message if no boards exist
 					if (noBoards) noBoards.style.display = "block";
 				} else {
 					// Hide "no boards" message
 					if (noBoards) noBoards.style.display = "none";
-					
+
 					// Display each board
-					boards.forEach(board => {
+					boards.forEach((board) => {
 						const boardCard = createBoardCard(board);
 						pastBoardsList.appendChild(boardCard);
 					});
 				}
 			} else {
 				console.error("Failed to load boards");
-				pastBoardsList.innerHTML = '<div class="error">Failed to load your boards. Please try again.</div>';
+				pastBoardsList.innerHTML =
+					'<div class="error">Failed to load your boards. Please try again.</div>';
 			}
 		} catch (error) {
 			console.error("Error loading boards:", error);
-			pastBoardsList.innerHTML = '<div class="error">Error loading your boards. Please refresh the page.</div>';
+			pastBoardsList.innerHTML =
+				'<div class="error">Error loading your boards. Please refresh the page.</div>';
 		}
 	};
-	
+
 	// Create board card element
 	const createBoardCard = (board) => {
 		const card = document.createElement("div");
 		card.className = "board-card";
-		
+
 		// Format date
 		const createdDate = new Date(board.createdAt);
-		const formattedDate = createdDate.toLocaleDateString('en-US', { 
-			year: 'numeric', 
-			month: 'short', 
-			day: 'numeric' 
+		const formattedDate = createdDate.toLocaleDateString("en-US", {
+			year: "numeric",
+			month: "short",
+			day: "numeric",
 		});
-		
+
 		card.innerHTML = `
 			<div class="board-card-header">
 				<h3>${board.name}</h3>
@@ -83,24 +85,26 @@ document.addEventListener("DOMContentLoaded", function () {
 				</button>
 			</div>
 		`;
-		
+
 		// Add event listeners to buttons
-		card.querySelector('.join-board').addEventListener('click', (e) => {
-			const roomId = e.currentTarget.getAttribute('data-room-id');
-			const name = e.currentTarget.getAttribute('data-name');
-			window.location.href = `/board?room=${encodeURIComponent(roomId)}&name=${encodeURIComponent(name)}`;
+		card.querySelector(".join-board").addEventListener("click", (e) => {
+			const roomId = e.currentTarget.getAttribute("data-room-id");
+			const name = e.currentTarget.getAttribute("data-name");
+			window.location.href = `/board?room=${encodeURIComponent(roomId)}&name=${encodeURIComponent(
+				name
+			)}`;
 		});
-		
-		card.querySelector('.board-delete').addEventListener('click', async (e) => {
-			const roomId = e.currentTarget.getAttribute('data-room-id');
+
+		card.querySelector(".board-delete").addEventListener("click", async (e) => {
+			const roomId = e.currentTarget.getAttribute("data-room-id");
 			if (confirm("Are you sure you want to delete this board? This action cannot be undone.")) {
 				await deleteBoard(roomId, card);
 			}
 		});
-		
+
 		return card;
 	};
-	
+
 	// Delete board function
 	const deleteBoard = async (roomId, cardElement) => {
 		try {
@@ -108,17 +112,17 @@ document.addEventListener("DOMContentLoaded", function () {
 			const response = await fetch(`${config.API_URL}/api/boards/${roomId}`, {
 				method: "DELETE",
 				headers: {
-					Authorization: `Bearer ${token}`
-				}
+					Authorization: `Bearer ${token}`,
+				},
 			});
-			
+
 			if (response.ok) {
 				// Remove card from UI with animation
 				cardElement.style.opacity = "0";
 				cardElement.style.transform = "scale(0.8)";
 				setTimeout(() => {
 					cardElement.remove();
-					
+
 					// Check if there are no more boards
 					const pastBoardsList = document.getElementById("pastBoardsList");
 					if (pastBoardsList && pastBoardsList.children.length === 0) {
@@ -141,27 +145,27 @@ document.addEventListener("DOMContentLoaded", function () {
 		const loginPrompt = document.getElementById("loginPrompt");
 		const boardsList = document.getElementById("pastBoardsList");
 		const noBoards = document.getElementById("noBoards");
-		
+
 		if (pastBoardsSection) {
 			const user = await checkAuth();
-			
+
 			if (user) {
 				// User is logged in - initially hide the section and check for boards
 				if (loginPrompt) loginPrompt.style.display = "none";
 				if (boardsList) boardsList.style.display = "grid";
-				
+
 				try {
 					const token = localStorage.getItem("token");
 					const response = await fetch(`${config.API_URL}/api/boards`, {
 						headers: {
-							Authorization: `Bearer ${token}`
-						}
+							Authorization: `Bearer ${token}`,
+						},
 					});
-					
+
 					if (response.ok) {
 						const data = await response.json();
 						const boards = data.boards;
-						
+
 						if (boards.length === 0) {
 							// User has no boards, hide the entire section
 							pastBoardsSection.style.display = "none";
@@ -263,16 +267,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Generate random room name
 	const generateRandomName = () => {
-		const adjectives = [
-			"Amazing",
-			"Brilliant",
-			"Creative",
-			"Dynamic",
-			"Energetic",
-			"Fantastic",
-			"Gorgeous",
-			"Happy",
-		];
+		const adjectives = ["Marshal's ", "Vaishnavi's ", "Mrunali's ", "Sanskruti's ", "Aditya's "];
 		const nouns = [
 			"Board",
 			"Canvas",
@@ -331,13 +326,13 @@ document.addEventListener("DOMContentLoaded", function () {
 					startBoardingButton.disabled = true;
 					startBoardingButton.textContent = "Looking for board...";
 					console.log(`Attempting to find board with code: ${roomName}`);
-					
+
 					const response = await fetch(`${config.API_URL}/api/boards/code/${roomName}`);
-					
+
 					// Reset button state
 					startBoardingButton.disabled = false;
 					startBoardingButton.textContent = "Start";
-					
+
 					if (response.ok) {
 						const data = await response.json();
 						console.log(`Board found with roomId: ${data.roomId}`);
@@ -350,7 +345,9 @@ document.addEventListener("DOMContentLoaded", function () {
 						// If server responds but board not found, show error and STOP
 						const data = await response.json();
 						console.error(`Error: ${data.error}`);
-						alert(`Board with code ${roomName} was not found. Please try a different code or enter a name for a new board.`);
+						alert(
+							`Board with code ${roomName} was not found. Please try a different code or enter a name for a new board.`
+						);
 						return; // Stop execution here - don't create a new board
 					}
 				} catch (error) {
@@ -364,7 +361,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 			// Only reach here if it's NOT a 6-digit code
 			console.log("Creating a new board with name:", roomName);
-			
+
 			// Check if user is authenticated
 			const user = await checkAuth();
 			if (user) {
@@ -372,7 +369,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				try {
 					startBoardingButton.disabled = true;
 					startBoardingButton.textContent = "Creating board...";
-					
+
 					const response = await fetch(`${config.API_URL}/api/boards`, {
 						method: "POST",
 						headers: {
@@ -467,23 +464,23 @@ document.addEventListener("DOMContentLoaded", function () {
 			const password = document.getElementById("password")?.value;
 
 			// Get error message element
-			const errorMessage = document.querySelector('.error-message');
-			
+			const errorMessage = document.querySelector(".error-message");
+
 			// Simple validation with modern error display
 			if (!fullName || !email || !password) {
 				errorMessage.textContent = "Please fill out all fields";
-				errorMessage.classList.add('visible');
+				errorMessage.classList.add("visible");
 				return;
 			}
 
 			if (password.length < 8) {
 				errorMessage.textContent = "Password must be at least 8 characters long!";
-				errorMessage.classList.add('visible');
-				
+				errorMessage.classList.add("visible");
+
 				// Highlight the password field as an error
-				const passwordField = document.getElementById('password');
-				passwordField.classList.add('error-field');
-				
+				const passwordField = document.getElementById("password");
+				passwordField.classList.add("error-field");
+
 				// Focus on the password field
 				passwordField.focus();
 				return;
@@ -505,27 +502,29 @@ document.addEventListener("DOMContentLoaded", function () {
 					localStorage.setItem("user", JSON.stringify(data.user));
 					window.location.href = "/";
 				} else {
-					errorMessage.textContent = data.error || "This email is already registered. Please use a different email or login instead.";
-					errorMessage.classList.add('visible');
-					
+					errorMessage.textContent =
+						data.error ||
+						"This email is already registered. Please use a different email or login instead.";
+					errorMessage.classList.add("visible");
+
 					// Highlight the email field as an error
-					const emailField = document.getElementById('register-email');
-					emailField.classList.add('error-field');
-					
+					const emailField = document.getElementById("register-email");
+					emailField.classList.add("error-field");
+
 					// Focus on the email field for better UX
 					emailField.focus();
 				}
 			} catch (error) {
 				console.error("Registration error:", error);
 				errorMessage.textContent = "Registration failed. Please try again.";
-				errorMessage.classList.add('visible');
+				errorMessage.classList.add("visible");
 			}
 		});
 	}
 
 	// Initialize past boards on page load
 	initializePastBoards();
-	
+
 	// Check and update auth status on page load
 	checkAuth().then(updateAuthUI);
 });
