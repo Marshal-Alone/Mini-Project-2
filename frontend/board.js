@@ -71,6 +71,10 @@ document.addEventListener("DOMContentLoaded", function () {
 		eraser: 30,
 	};
 
+	// Event processing queue for received events
+	let eventQueue = [];
+	let isProcessingQueue = false;
+
 	// History for undo/redo
 	const history = [];
 	let historyIndex = -1;
@@ -111,8 +115,13 @@ document.addEventListener("DOMContentLoaded", function () {
 		}
 	}
 
-	// Save current state to history
+	// Save current state to history with performance optimization
 	function saveState() {
+		// Skip saving if we've saved recently (within 100ms) to avoid excessive saves
+		const now = Date.now();
+		if (now - lastSaveTime < 100) return;
+		lastSaveTime = now;
+
 		// Remove any states after current index if we've gone back in history
 		if (historyIndex < history.length - 1) {
 			history.splice(historyIndex + 1);
@@ -124,7 +133,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			historyIndex--;
 		}
 
-		// Create a new image from the canvas
+		// Create a new image from the canvas with optimization
 		const newState = new Image();
 		newState.src = canvas.toDataURL("image/png", 0.5); // Use compression for better performance
 
@@ -172,6 +181,28 @@ document.addEventListener("DOMContentLoaded", function () {
 		currentWidth = toolSizes[currentTool];
 	}
 
+	// Optimize drawing with requestAnimationFrame
+	let drawAnimationFrame = null;
+	let lastDrawEvent = null;
+
+	function scheduleDraw(e) {
+		if (!isDrawing) return;
+
+		lastDrawEvent = e;
+
+		// If we already have a drawing frame scheduled, don't schedule another
+		if (drawAnimationFrame) return;
+
+		// Schedule drawing on next animation frame for smoother performance
+		drawAnimationFrame = requestAnimationFrame(() => {
+			if (lastDrawEvent) {
+				draw(lastDrawEvent);
+				lastDrawEvent = null;
+			}
+			drawAnimationFrame = null;
+		});
+	}
+
 	// Drawing functions
 	function startDrawing(e) {
 		isDrawing = true;
@@ -194,58 +225,8 @@ document.addEventListener("DOMContentLoaded", function () {
 		}
 	}
 
-	// Set up draw event optimization
 	let lastEmitTime = 0;
-	const EMIT_THROTTLE = 16; // ~60fps
-	let drawQueue = [];
-
-	// Set up the interval for batched event sending
-	const BATCH_INTERVAL = 100; // Send batched events every 100ms
-
-	// Function to throttle and optimize draw event emissions
-	function throttledEmitDrawEvent(data) {
-		const now = Date.now();
-
-		// Only add points that have changed significantly to reduce payload size
-		if (data.points && data.points.length > 3) {
-			data.points = data.points.slice(-3); // Only send the last 3 points
-		}
-
-		// Add to queue for batched sending
-		drawQueue.push(data);
-
-		// Only emit if we're past the throttle interval
-		if (now - lastEmitTime > EMIT_THROTTLE) {
-			// For immediate feedback on crucial events, send them right away
-			if (data.isFinalSegment || data.tool !== "brush") {
-				socket.volatile.emit("drawEvent", data);
-			}
-			lastEmitTime = now;
-		}
-	}
-
-	// Set up interval to send batched events
-	setInterval(() => {
-		if (drawQueue.length > 0) {
-			// Only send the first 10 events if the queue is very large
-			const eventsToSend =
-				drawQueue.length > 10 ? [...drawQueue.slice(0, 5), ...drawQueue.slice(-5)] : drawQueue;
-
-			// If there are still many events, send them as a batch
-			if (eventsToSend.length > 1) {
-				socket.volatile.emit("batchDrawEvents", {
-					events: eventsToSend,
-					timestamp: Date.now(),
-				});
-			} else if (eventsToSend.length === 1) {
-				// Just send the single event normally
-				socket.volatile.emit("drawEvent", eventsToSend[0]);
-			}
-
-			// Clear the queue
-			drawQueue = [];
-		}
-	}, BATCH_INTERVAL);
+	const EMIT_THROTTLE = 16; // ~60fps - throttle to about 60 events per second
 
 	function draw(e) {
 		if (!isDrawing) return;
@@ -284,51 +265,63 @@ document.addEventListener("DOMContentLoaded", function () {
 				// Add current point
 				window.brushPoints.push({ x: currentX, y: currentY });
 
-				// Keep a reasonable number of points for smooth curves
-				if (window.brushPoints.length > 20) {
+				// Keep a reasonable number of points for smooth curves - optimize for performance
+				if (window.brushPoints.length > 4) {
 					window.brushPoints.shift();
 				}
 
 				// Draw smooth curve through points
 				if (window.brushPoints.length >= 2) {
 					ctx.beginPath();
-					ctx.moveTo(lastX, lastY);
 
-					if (window.brushPoints.length === 2) {
-						ctx.lineTo(currentX, currentY);
+					// Use optimized curve drawing
+					const points = window.brushPoints;
+					ctx.moveTo(points[0].x, points[0].y);
+
+					// For small number of points, use simple line
+					if (points.length === 2) {
+						ctx.lineTo(points[1].x, points[1].y);
 					} else {
-						let i = 0;
-						ctx.moveTo(window.brushPoints[0].x, window.brushPoints[0].y);
+						// Use quadratic curves for smoother line with fewer points
+						for (let i = 0; i < points.length - 1; i++) {
+							const xc = (points[i].x + points[i + 1].x) / 2;
+							const yc = (points[i].y + points[i + 1].y) / 2;
 
-						for (i = 1; i < window.brushPoints.length - 2; i++) {
-							const xc = (window.brushPoints[i].x + window.brushPoints[i + 1].x) / 2;
-							const yc = (window.brushPoints[i].y + window.brushPoints[i + 1].y) / 2;
-							ctx.quadraticCurveTo(window.brushPoints[i].x, window.brushPoints[i].y, xc, yc);
+							if (i === 0) {
+								// First curve segment
+								ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
+							} else {
+								// Middle curve segments
+								ctx.lineTo(xc, yc);
+							}
 						}
-
-						ctx.quadraticCurveTo(
-							window.brushPoints[i].x,
-							window.brushPoints[i].y,
-							window.brushPoints[i + 1].x,
-							window.brushPoints[i + 1].y
-						);
 					}
 
 					ctx.stroke();
 				}
 
-				// Use the throttled emit function
-				throttledEmitDrawEvent({
-					tool: "brush",
-					startX: lastX,
-					startY: lastY,
-					endX: currentX,
-					endY: currentY,
-					points: window.brushPoints.slice(-3), // Only send the last 3 points
-					color: currentColor,
-					width: currentWidth,
-					timestamp: Date.now(),
-				});
+				// Throttle emit events to reduce network traffic
+				const now = Date.now();
+				if (now - lastEmitTime >= EMIT_THROTTLE) {
+					// Send minimal data for better network performance
+					const pointsToSend = window.brushPoints.map((p) => ({
+						x: Math.round(p.x * 10) / 10, // Reduce precision for smaller data
+						y: Math.round(p.y * 10) / 10,
+					}));
+
+					socket.emit("drawEvent", {
+						tool: "brush",
+						startX: lastX,
+						startY: lastY,
+						endX: currentX,
+						endY: currentY,
+						points: pointsToSend,
+						color: currentColor,
+						width: currentWidth,
+						timestamp: now,
+					});
+					lastEmitTime = now;
+				}
 				break;
 
 			case "eraser":
@@ -350,19 +343,24 @@ document.addEventListener("DOMContentLoaded", function () {
 				ctx.arc(currentX, currentY, eraserSize / 2, 0, Math.PI * 2, false);
 				ctx.fill();
 
-				// Use the throttled emit function
-				throttledEmitDrawEvent({
-					tool: "eraser",
-					startX: lastX,
-					startY: lastY,
-					endX: currentX,
-					endY: currentY,
-					width: eraserSize,
-					timestamp: Date.now(), // Add timestamp for sequencing
-				});
+				// Throttle emit events to reduce network traffic
+				const eraserNow = Date.now();
+				if (eraserNow - lastEmitTime >= EMIT_THROTTLE) {
+					socket.emit("drawEvent", {
+						tool: "eraser",
+						startX: lastX,
+						startY: lastY,
+						endX: currentX,
+						endY: currentY,
+						width: eraserSize,
+						timestamp: eraserNow, // Add timestamp for sequencing
+					});
+					lastEmitTime = eraserNow;
+				}
 
 				// Save state after erasing occasionally to avoid performance issues
-				if (Math.random() < 0.05) {
+				if (Math.random() < 0.02) {
+					// Reduced from 0.05 to 0.02 for better performance
 					saveState();
 				}
 				break;
@@ -402,11 +400,13 @@ document.addEventListener("DOMContentLoaded", function () {
 				ctx.strokeStyle = rectColor;
 				ctx.lineWidth = rectWidth;
 				ctx.fillStyle = "transparent";
-				ctx.beginPath();
+
+				// Optimize rectangle drawing
 				const width = currentX - lastX;
 				const height = currentY - lastY;
-				ctx.rect(lastX, lastY, width, height);
-				ctx.stroke();
+
+				// Use direct rectangle drawing instead of path for better performance
+				ctx.strokeRect(lastX, lastY, width, height);
 				break;
 
 			case "circle":
@@ -420,8 +420,10 @@ document.addEventListener("DOMContentLoaded", function () {
 				ctx.strokeStyle = circleColor;
 				ctx.lineWidth = circleWidth;
 				ctx.fillStyle = "transparent";
-				ctx.beginPath();
+
+				// Optimize circle drawing calculations
 				const radius = Math.sqrt(Math.pow(currentX - lastX, 2) + Math.pow(currentY - lastY, 2));
+				ctx.beginPath();
 				ctx.arc(lastX, lastY, radius, 0, Math.PI * 2);
 				ctx.stroke();
 				break;
@@ -461,15 +463,14 @@ document.addEventListener("DOMContentLoaded", function () {
 				window.brushPoints.push({ x: currentX, y: currentY });
 			}
 
-			// Emit final event with relevant points (not all points)
-			// Send the final event immediately - this is important
+			// Emit final event with all collected points
 			socket.emit("drawEvent", {
 				tool: "brush",
 				startX: window.brushPoints[0].x,
 				startY: window.brushPoints[0].y,
 				endX: currentX,
 				endY: currentY,
-				points: window.brushPoints.slice(-5), // Send the last 5 points for smoothness
+				points: window.brushPoints.map((p) => ({ x: p.x, y: p.y })),
 				color: currentColor,
 				width: currentWidth,
 				timestamp: Date.now(),
@@ -573,10 +574,47 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Handle received drawing events
 	socket.on("drawEvent", (data) => {
-		// Always save the current canvas state before applying new changes
+		// Add event to the queue instead of processing immediately
+		eventQueue.push(data);
+
+		// Start processing queue if not already processing
+		if (!isProcessingQueue) {
+			requestAnimationFrame(processEventQueue);
+		}
+	});
+
+	// Process events in the queue in batches
+	function processEventQueue() {
+		if (isProcessingQueue || eventQueue.length === 0) return;
+
+		isProcessingQueue = true;
+
+		// Process up to 10 events at a time for smooth performance
+		const eventsToProcess = eventQueue.splice(0, 10);
+
+		// Save current canvas state once before batch processing
 		const tempState = new Image();
 		tempState.src = canvas.toDataURL();
 
+		eventsToProcess.forEach((data) => {
+			processDrawEvent(data);
+		});
+
+		isProcessingQueue = false;
+
+		// If there are more events to process, schedule the next batch
+		if (eventQueue.length > 0) {
+			requestAnimationFrame(processEventQueue);
+		}
+
+		// Save state occasionally to prevent performance issues
+		if (Math.random() < 0.2) {
+			saveState();
+		}
+	}
+
+	// Process a single drawing event
+	function processDrawEvent(data) {
 		// Set context properties for drawing
 		ctx.lineWidth = data.width || data.lineWidth || 5; // Ensure we have a line width
 
@@ -592,28 +630,27 @@ document.addEventListener("DOMContentLoaded", function () {
 				ctx.lineCap = "round";
 				ctx.lineJoin = "round";
 
-				// Draw smooth curve if points are provided
+				// Draw smooth curve if points are provided with optimized rendering
 				if (data.points && data.points.length >= 2) {
 					ctx.beginPath();
-					ctx.moveTo(data.points[0].x, data.points[0].y);
+					const points = data.points;
+					ctx.moveTo(points[0].x, points[0].y);
 
-					if (data.points.length === 2) {
-						ctx.lineTo(data.points[1].x, data.points[1].y);
+					// Optimize curve drawing based on point count
+					if (points.length === 2) {
+						ctx.lineTo(points[1].x, points[1].y);
 					} else {
-						let i = 0;
-						for (i = 1; i < data.points.length - 2; i++) {
-							const xc = (data.points[i].x + data.points[i + 1].x) / 2;
-							const yc = (data.points[i].y + data.points[i + 1].y) / 2;
-							ctx.quadraticCurveTo(data.points[i].x, data.points[i].y, xc, yc);
-						}
+						// Use optimized curve algorithm to reduce computation
+						for (let i = 0; i < points.length - 1; i++) {
+							const xc = (points[i].x + points[i + 1].x) / 2;
+							const yc = (points[i].y + points[i + 1].y) / 2;
 
-						// Curve through the last two points
-						ctx.quadraticCurveTo(
-							data.points[i].x,
-							data.points[i].y,
-							data.points[i + 1].x,
-							data.points[i + 1].y
-						);
+							if (i === 0) {
+								ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
+							} else {
+								ctx.lineTo(xc, yc);
+							}
+						}
 					}
 					ctx.stroke();
 				} else {
@@ -642,18 +679,15 @@ document.addEventListener("DOMContentLoaded", function () {
 					ctx.moveTo(data.startX, data.startY);
 					ctx.lineTo(data.endX, data.endY);
 					ctx.stroke();
-				}
 
-				// Also draw a circle for spot erasing (either at end point or provided position)
-				ctx.beginPath();
-				const eraserX = data.endX || data.startX;
-				const eraserY = data.endY || data.startY;
-				ctx.arc(eraserX, eraserY, data.width / 2, 0, Math.PI * 2, false);
-				ctx.fill();
+					// Also draw a circle at end position for spot erasing
+					ctx.beginPath();
+					ctx.arc(data.endX, data.endY, data.width / 2, 0, Math.PI * 2, false);
+					ctx.fill();
+				}
 				break;
 
 			case "line":
-				ctx.globalCompositeOperation = "source-over"; // Ensure normal drawing mode
 				ctx.strokeStyle = data.color || "#000000";
 				ctx.lineWidth = data.lineWidth || data.width || 5;
 				ctx.fillStyle = "transparent";
@@ -664,7 +698,6 @@ document.addEventListener("DOMContentLoaded", function () {
 				break;
 
 			case "rectangle":
-				ctx.globalCompositeOperation = "source-over"; // Ensure normal drawing mode
 				ctx.strokeStyle = data.color || "#000000";
 				ctx.lineWidth = data.lineWidth || data.width || 5;
 				ctx.fillStyle = "transparent";
@@ -674,7 +707,6 @@ document.addEventListener("DOMContentLoaded", function () {
 				break;
 
 			case "circle":
-				ctx.globalCompositeOperation = "source-over"; // Ensure normal drawing mode
 				ctx.strokeStyle = data.color || "#000000";
 				ctx.lineWidth = data.lineWidth || data.width || 5;
 				ctx.fillStyle = "transparent";
@@ -695,14 +727,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		// Reset context properties after drawing
 		ctx.globalCompositeOperation = "source-over";
 		ctx.globalAlpha = 1;
-
-		// Save state after each received event to ensure history is updated
-		// but only save occasionally to prevent performance issues
-		if (Math.random() < 0.2) {
-			// 20% chance to save state
-			saveState();
-		}
-	});
+	}
 
 	// Handle clear canvas event
 	socket.on("clearCanvas", (data) => {
@@ -735,25 +760,29 @@ document.addEventListener("DOMContentLoaded", function () {
 		showToast("Board cleared", "info");
 	});
 
-	// Add event listeners for drawing
+	// Add event listeners for drawing with optimized handlers
 	canvas.addEventListener("mousedown", startDrawing);
-	canvas.addEventListener("mousemove", (e) => {
-		draw(e);
-		// Only update eraser cursor if the current tool is eraser
-		if (currentTool === "eraser") {
-			updateEraserCursor(e);
-		}
-	});
+	canvas.addEventListener("mousemove", scheduleDraw); // Use scheduleDraw instead of direct draw
 
 	// Add global document mousemove listener to handle cursor outside canvas
 	document.addEventListener("mousemove", (e) => {
 		if (currentTool === "eraser") {
 			updateEraserCursor(e);
 		}
+
+		if (isDrawing) {
+			// Continue drawing even if cursor moves outside canvas
+			scheduleDraw(e);
+		}
 	});
 
 	canvas.addEventListener("mouseup", stopDrawing);
-	canvas.addEventListener("mouseout", stopDrawing);
+	canvas.addEventListener("mouseout", (e) => {
+		// Only stop drawing if mouse moves outside the window
+		if (e.relatedTarget === null) {
+			stopDrawing(e);
+		}
+	});
 
 	// Add mouseenter and mouseleave events for eraser cursor
 	canvas.addEventListener("mouseenter", (e) => {
@@ -807,7 +836,10 @@ document.addEventListener("DOMContentLoaded", function () {
 		}
 	}
 
-	// Add touch support for mobile devices
+	// Add touch support for mobile devices with performance optimizations
+	let lastTouchTime = 0;
+	const TOUCH_THROTTLE = 16; // Match the emit throttle rate
+
 	canvas.addEventListener("touchstart", (e) => {
 		e.preventDefault();
 		const touch = e.touches[0];
@@ -820,6 +852,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	canvas.addEventListener("touchmove", (e) => {
 		e.preventDefault();
+
+		// Throttle touch events to improve performance on mobile
+		const now = Date.now();
+		if (now - lastTouchTime < TOUCH_THROTTLE) {
+			return; // Skip this touch event to reduce processing load
+		}
+		lastTouchTime = now;
+
 		const touch = e.touches[0];
 		const mouseEvent = new MouseEvent("mousemove", {
 			clientX: touch.clientX,
@@ -1920,6 +1960,11 @@ document.addEventListener("DOMContentLoaded", function () {
 						ctx.moveTo(data.startX, data.startY);
 						ctx.lineTo(data.endX, data.endY);
 						ctx.stroke();
+
+						// Also draw a circle at end position for spot erasing
+						ctx.beginPath();
+						ctx.arc(data.endX, data.endY, data.width / 2, 0, Math.PI * 2, false);
+						ctx.fill();
 					}
 
 					// Spot erasing with a circle
@@ -3150,93 +3195,6 @@ document.addEventListener("DOMContentLoaded", function () {
 			setTimeout(() => imageManager.redrawAllImages(), 100);
 		}
 	};
-
-	// ... rest of existing code ...
-
-	// Handle received batch drawing events
-	socket.on("batchDrawEvents", (batchData) => {
-		if (batchData && batchData.events && Array.isArray(batchData.events)) {
-			// Sort events by timestamp to ensure proper order
-			const sortedEvents = batchData.events.sort((a, b) => a.timestamp - b.timestamp);
-
-			// Process each event
-			sortedEvents.forEach((data) => {
-				// Use the same logic as individual drawEvent handling
-				// Set context properties for drawing
-				ctx.lineWidth = data.width || data.lineWidth || 5; // Ensure we have a line width
-
-				// Reset context state to ensure clean drawing
-				ctx.globalCompositeOperation = "source-over";
-				ctx.globalAlpha = data.opacity !== undefined ? data.opacity : 1.0;
-
-				switch (data.tool) {
-					case "brush":
-						ctx.globalCompositeOperation = "source-over";
-						ctx.strokeStyle = data.color || "#000000";
-						ctx.lineWidth = data.width;
-						ctx.lineCap = "round";
-						ctx.lineJoin = "round";
-
-						// Draw smooth curve if points are provided
-						if (data.points && data.points.length >= 2) {
-							ctx.beginPath();
-							ctx.moveTo(data.points[0].x, data.points[0].y);
-
-							if (data.points.length === 2) {
-								ctx.lineTo(data.points[1].x, data.points[1].y);
-							} else {
-								let i = 0;
-								for (i = 1; i < data.points.length - 2; i++) {
-									const xc = (data.points[i].x + data.points[i + 1].x) / 2;
-									const yc = (data.points[i].y + data.points[i + 1].y) / 2;
-									ctx.quadraticCurveTo(data.points[i].x, data.points[i].y, xc, yc);
-								}
-
-								// Curve through the last two points
-								ctx.quadraticCurveTo(
-									data.points[i].x,
-									data.points[i].y,
-									data.points[i + 1].x,
-									data.points[i + 1].y
-								);
-							}
-							ctx.stroke();
-						} else {
-							// Fallback to simple line for older data
-							ctx.beginPath();
-							ctx.moveTo(data.startX, data.startY);
-							ctx.lineTo(data.endX, data.endY);
-							ctx.stroke();
-						}
-						break;
-					case "eraser":
-						// Handle eraser events
-						ctx.globalCompositeOperation = "destination-out";
-						ctx.beginPath();
-						ctx.lineWidth = data.width;
-						ctx.moveTo(data.startX, data.startY);
-						ctx.lineTo(data.endX, data.endY);
-						ctx.stroke();
-
-						// Also draw a circle at endpoint for spot erasing
-						ctx.beginPath();
-						ctx.arc(data.endX, data.endY, data.width / 2, 0, Math.PI * 2, false);
-						ctx.fill();
-						break;
-					// Handle other tools...
-				}
-			});
-
-			// Reset context properties
-			ctx.globalCompositeOperation = "source-over";
-			ctx.globalAlpha = 1;
-
-			// Save state occasionally to allow for undo/redo
-			if (Math.random() < 0.2) {
-				saveState();
-			}
-		}
-	});
 
 	// ... rest of existing code ...
 });
