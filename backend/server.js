@@ -669,6 +669,13 @@ io.on("connection", (socket) => {
 	socket.on("drawEvent", async (data) => {
 		const roomId = socket.roomId;
 
+		// if (throttleEvents(socket, "drawEvent")) {
+		// 	socket.emit("throttleWarning", {
+		// 		message: "Drawing events are being throttled to maintain performance",
+		// 	});
+		// 	return;
+		// }
+
 		// Add timestamp if not present
 		if (!data.timestamp) {
 			data.timestamp = Date.now();
@@ -705,11 +712,20 @@ io.on("connection", (socket) => {
 				await Board.updateOne(
 					{ roomId },
 					{
-						$push: { history: data },
-						$set: { updatedAt: Date.now() },
+						$push: {
+							history: {
+								$each: [data],
+								$slice: -1000, // Keep last 1000 events
+							},
+						},
+						$set: { updatedAt: Date.now(), lastSync: Date.now() },
 					},
 					{ new: true }
 				);
+				// Update room's last sync time
+				if (rooms[roomId]) {
+					rooms[roomId].lastSync = Date.now();
+				}
 			}
 		} catch (error) {
 			console.error("Error saving drawing event:", error);

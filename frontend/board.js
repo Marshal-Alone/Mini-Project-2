@@ -151,14 +151,14 @@ document.addEventListener("DOMContentLoaded", function () {
 	});
 
 	// Add event listeners for other tool sizes
-	document.getElementById("lineSize")?.addEventListener("change", (e) => {
+	document.getElementById("lineSize")?.addEventListener("input", (e) => {
 		toolSizes.line = parseInt(e.target.value);
 		if (currentTool === "line") {
 			currentWidth = toolSizes.line;
 		}
 	});
 
-	document.getElementById("shapeSize")?.addEventListener("change", (e) => {
+	document.getElementById("shapeSize")?.addEventListener("input", (e) => {
 		const size = parseInt(e.target.value);
 		toolSizes.rectangle = size;
 		toolSizes.circle = size;
@@ -326,8 +326,11 @@ document.addEventListener("DOMContentLoaded", function () {
 				if (historyIndex >= 0) {
 					ctx.drawImage(history[historyIndex], 0, 0);
 				}
-				ctx.strokeStyle = currentColor;
-				ctx.lineWidth = currentWidth;
+				// Use line-specific color and width if available
+				const lineColor = lineColorInput ? lineColorInput.value : currentColor;
+				const lineWidth = lineSizeSlider ? parseInt(lineSizeSlider.value) : currentWidth;
+				ctx.strokeStyle = lineColor;
+				ctx.lineWidth = lineWidth;
 				ctx.fillStyle = "transparent";
 				ctx.beginPath();
 				ctx.moveTo(lastX, lastY);
@@ -340,8 +343,11 @@ document.addEventListener("DOMContentLoaded", function () {
 				if (historyIndex >= 0) {
 					ctx.drawImage(history[historyIndex], 0, 0);
 				}
-				ctx.strokeStyle = currentColor;
-				ctx.lineWidth = currentWidth;
+				// Use rectangle-specific color and width if available
+				const rectColor = rectangleColorInput ? rectangleColorInput.value : currentColor;
+				const rectWidth = rectangleSizeSlider ? parseInt(rectangleSizeSlider.value) : currentWidth;
+				ctx.strokeStyle = rectColor;
+				ctx.lineWidth = rectWidth;
 				ctx.fillStyle = "transparent";
 				ctx.beginPath();
 				const width = currentX - lastX;
@@ -355,8 +361,11 @@ document.addEventListener("DOMContentLoaded", function () {
 				if (historyIndex >= 0) {
 					ctx.drawImage(history[historyIndex], 0, 0);
 				}
-				ctx.strokeStyle = currentColor;
-				ctx.lineWidth = currentWidth;
+				// Use circle-specific color and width if available
+				const circleColor = circleColorInput ? circleColorInput.value : currentColor;
+				const circleWidth = circleSizeSlider ? parseInt(circleSizeSlider.value) : currentWidth;
+				ctx.strokeStyle = circleColor;
+				ctx.lineWidth = circleWidth;
 				ctx.fillStyle = "transparent";
 				ctx.beginPath();
 				const radius = Math.sqrt(Math.pow(currentX - lastX, 2) + Math.pow(currentY - lastY, 2));
@@ -424,38 +433,49 @@ document.addEventListener("DOMContentLoaded", function () {
 		if (currentTool !== "brush" && currentTool !== "pencil") {
 			switch (currentTool) {
 				case "line":
+					// Use line-specific color and width if available
+					const lineColor = lineColorInput ? lineColorInput.value : currentColor;
+					const lineWidth = lineSizeSlider ? parseInt(lineSizeSlider.value) : currentWidth;
 					socket.emit("drawEvent", {
 						tool: "line",
 						startX: lastX,
 						startY: lastY,
 						endX: currentX,
 						endY: currentY,
-						color: currentColor,
-						width: currentWidth,
+						color: lineColor,
+						width: lineWidth,
 					});
 					break;
 
 				case "rectangle":
+					// Use rectangle-specific color and width if available
+					const rectColor = rectangleColorInput ? rectangleColorInput.value : currentColor;
+					const rectWidth = rectangleSizeSlider
+						? parseInt(rectangleSizeSlider.value)
+						: currentWidth;
 					socket.emit("drawEvent", {
 						tool: "rectangle",
 						startX: lastX,
 						startY: lastY,
 						width: currentX - lastX,
 						height: currentY - lastY,
-						color: currentColor,
-						lineWidth: currentWidth, // Change width to lineWidth to avoid conflict
+						color: rectColor,
+						lineWidth: rectWidth, // Change width to lineWidth to avoid conflict
 					});
 					break;
 
 				case "circle":
 					const radius = Math.sqrt(Math.pow(currentX - lastX, 2) + Math.pow(currentY - lastY, 2));
+					// Use circle-specific color and width if available
+					const circleColor = circleColorInput ? circleColorInput.value : currentColor;
+					const circleWidth = circleSizeSlider ? parseInt(circleSizeSlider.value) : currentWidth;
 					socket.emit("drawEvent", {
 						tool: "circle",
 						centerX: lastX,
 						centerY: lastY,
 						radius: radius,
-						color: currentColor,
-						lineWidth: currentWidth, // Change width to lineWidth to avoid conflict
+						color: circleColor,
+						lineWidth: circleWidth, // Change width to lineWidth to avoid conflict
 					});
 					break;
 			}
@@ -769,6 +789,73 @@ document.addEventListener("DOMContentLoaded", function () {
 	const textSizeSlider = document.getElementById("textSize");
 	const textFontSelect = document.getElementById("textFont");
 
+	// Shape tool settings
+	const lineSettings = document.getElementById("lineSettings");
+	const lineColorInput = document.getElementById("lineColor");
+	const lineSizeSlider = document.getElementById("lineSize");
+
+	const rectangleSettings = document.getElementById("rectangleSettings");
+	const rectangleColorInput = document.getElementById("rectangleColor");
+	const rectangleSizeSlider = document.getElementById("rectangleSize");
+
+	const circleSettings = document.getElementById("circleSettings");
+	const circleColorInput = document.getElementById("circleColor");
+	const circleSizeSlider = document.getElementById("circleSize");
+
+	// Line settings
+	if (lineColorInput) {
+		lineColorInput.addEventListener("input", (e) => {
+			if (currentTool === "line") {
+				currentColor = e.target.value;
+			}
+		});
+	}
+
+	if (lineSizeSlider) {
+		lineSizeSlider.addEventListener("input", (e) => {
+			toolSizes.line = parseInt(e.target.value);
+			if (currentTool === "line") {
+				currentWidth = toolSizes.line;
+			}
+		});
+	}
+
+	// Rectangle settings
+	if (rectangleColorInput) {
+		rectangleColorInput.addEventListener("input", (e) => {
+			if (currentTool === "rectangle") {
+				currentColor = e.target.value;
+			}
+		});
+	}
+
+	if (rectangleSizeSlider) {
+		rectangleSizeSlider.addEventListener("input", (e) => {
+			toolSizes.rectangle = parseInt(e.target.value);
+			if (currentTool === "rectangle") {
+				currentWidth = toolSizes.rectangle;
+			}
+		});
+	}
+
+	// Circle settings
+	if (circleColorInput) {
+		circleColorInput.addEventListener("input", (e) => {
+			if (currentTool === "circle") {
+				currentColor = e.target.value;
+			}
+		});
+	}
+
+	if (circleSizeSlider) {
+		circleSizeSlider.addEventListener("input", (e) => {
+			toolSizes.circle = parseInt(e.target.value);
+			if (currentTool === "circle") {
+				currentWidth = toolSizes.circle;
+			}
+		});
+	}
+
 	// Update text settings
 	if (textColorInput) {
 		textColorInput.addEventListener("input", (e) => {
@@ -803,9 +890,47 @@ document.addEventListener("DOMContentLoaded", function () {
 			// Add active class to clicked button
 			button.classList.add("active");
 
+			// Store the previous tool
+			const previousTool = currentTool;
+
 			// Set current tool
 			currentTool = button.dataset.tool;
 			updateToolSize();
+
+			// Sync colors between tools if changing between drawing tools
+			if (previousTool !== currentTool) {
+				// If switching to line, rectangle, or circle, sync their color with the current color
+				switch (currentTool) {
+					case "brush":
+						if (brushColorInput) brushColorInput.value = currentColor;
+						break;
+					case "line":
+						if (lineColorInput) lineColorInput.value = currentColor;
+						break;
+					case "rectangle":
+						if (rectangleColorInput) rectangleColorInput.value = currentColor;
+						break;
+					case "circle":
+						if (circleColorInput) circleColorInput.value = currentColor;
+						break;
+					case "text":
+						if (textColorInput) textColorInput.value = currentColor;
+						break;
+				}
+
+				// If switching from a tool with color settings, update current color
+				if (previousTool === "brush" && brushColorInput) {
+					currentColor = brushColorInput.value;
+				} else if (previousTool === "line" && lineColorInput) {
+					currentColor = lineColorInput.value;
+				} else if (previousTool === "rectangle" && rectangleColorInput) {
+					currentColor = rectangleColorInput.value;
+				} else if (previousTool === "circle" && circleColorInput) {
+					currentColor = circleColorInput.value;
+				} else if (previousTool === "text" && textColorInput) {
+					currentColor = textColorInput.value;
+				}
+			}
 
 			// Update canvas class to indicate eraser is active or not
 			if (currentTool === "eraser") {
@@ -818,6 +943,9 @@ document.addEventListener("DOMContentLoaded", function () {
 			brushSettingsPopup.style.display = "none";
 			eraserSettings.style.display = "none";
 			textSettings.style.display = "none";
+			lineSettings.style.display = "none";
+			rectangleSettings.style.display = "none";
+			circleSettings.style.display = "none";
 
 			// Explicitly hide eraser cursor when switching tools
 			const eraserCursor = document.getElementById("eraserCursor");
@@ -839,12 +967,41 @@ document.addEventListener("DOMContentLoaded", function () {
 			switch (currentTool) {
 				case "brush":
 					brushSettingsPopup.style.display = "block";
+					// Update brush color input
+					if (brushColorInput) brushColorInput.value = currentColor;
+					// Update brush size
+					if (brushSizeSlider) brushSizeSlider.value = toolSizes.brush;
 					break;
 				case "eraser":
 					eraserSettings.style.display = "block";
 					break;
+				case "line":
+					lineSettings.style.display = "block";
+					// Update line color to match current color
+					if (lineColorInput) lineColorInput.value = currentColor;
+					// Update line size to match current size
+					if (lineSizeSlider) lineSizeSlider.value = toolSizes.line;
+					break;
+				case "rectangle":
+					rectangleSettings.style.display = "block";
+					// Update rectangle color to match current color
+					if (rectangleColorInput) rectangleColorInput.value = currentColor;
+					// Update rectangle size to match current size
+					if (rectangleSizeSlider) rectangleSizeSlider.value = toolSizes.rectangle;
+					break;
+				case "circle":
+					circleSettings.style.display = "block";
+					// Update circle color to match current color
+					if (circleColorInput) circleColorInput.value = currentColor;
+					// Update circle size to match current size
+					if (circleSizeSlider) circleSizeSlider.value = toolSizes.circle;
+					break;
 				case "text":
 					textSettings.style.display = "block";
+					// Update text color
+					if (textColorInput) textColorInput.value = currentColor;
+					// Update text size
+					if (textSizeSlider) textSizeSlider.value = currentWidth;
 					break;
 			}
 
@@ -887,12 +1044,50 @@ document.addEventListener("DOMContentLoaded", function () {
 	colorPicker.addEventListener("input", (e) => {
 		currentColor = e.target.value;
 		ctx.strokeStyle = currentColor; // Immediately update the strokeStyle
+
+		// Sync color with the currently active tool's color picker
+		switch (currentTool) {
+			case "brush":
+				if (brushColorInput) brushColorInput.value = currentColor;
+				break;
+			case "line":
+				if (lineColorInput) lineColorInput.value = currentColor;
+				break;
+			case "rectangle":
+				if (rectangleColorInput) rectangleColorInput.value = currentColor;
+				break;
+			case "circle":
+				if (circleColorInput) circleColorInput.value = currentColor;
+				break;
+			case "text":
+				if (textColorInput) textColorInput.value = currentColor;
+				break;
+		}
 	});
 
 	// Add color picker change event for completion
 	colorPicker.addEventListener("change", (e) => {
 		currentColor = e.target.value;
 		ctx.strokeStyle = currentColor;
+
+		// Sync color with the currently active tool's color picker
+		switch (currentTool) {
+			case "brush":
+				if (brushColorInput) brushColorInput.value = currentColor;
+				break;
+			case "line":
+				if (lineColorInput) lineColorInput.value = currentColor;
+				break;
+			case "rectangle":
+				if (rectangleColorInput) rectangleColorInput.value = currentColor;
+				break;
+			case "circle":
+				if (circleColorInput) circleColorInput.value = currentColor;
+				break;
+			case "text":
+				if (textColorInput) textColorInput.value = currentColor;
+				break;
+		}
 	});
 
 	// Stroke width
@@ -2172,15 +2367,16 @@ document.addEventListener("DOMContentLoaded", function () {
 	document.body.appendChild(imageUploadInput);
 
 	// Add image upload button to toolbar
-	const imageUploadButton = document.createElement("button");
-	imageUploadButton.innerHTML = "Upload Image";
+	// const imageUploadButton = document.createElement("button");
+	const imageUploadButton = document.getElementById("imageUploadBtn");
+	// imageUploadButton.innerHTML = "Upload Image";
 	imageUploadButton.addEventListener("click", () => {
 		imageUploadInput.click();
 	});
 
 	// Add the button to your toolbar
 	const toolbar = document.querySelector(".toolbar");
-	toolbar.appendChild(imageUploadButton);
+	// toolbar.appendChild(imageUploadButton);
 
 	// Add styles for image handles
 	const style = document.createElement("style");
@@ -2296,57 +2492,38 @@ document.addEventListener("DOMContentLoaded", function () {
 			}
 		}
 
-		async redrawAllImages() {
-			if (this.isRedrawing || this.isLoadingImages) return;
-			if (this.placedImages.size === 0) return; // Don't redraw if no images
-
+		redrawAllImages() {
+			if (this.isRedrawing) return;
 			this.isRedrawing = true;
-			// console.log(`Redrawing ${this.placedImages.size} images`);
 
 			try {
+				console.log("Redrawing all images");
+
 				// Create a temporary canvas to store current drawings
 				const tempCanvas = document.createElement("canvas");
 				tempCanvas.width = this.canvas.width;
 				tempCanvas.height = this.canvas.height;
 				const tempCtx = tempCanvas.getContext("2d");
+
+				// Copy current canvas content to temp canvas
 				tempCtx.drawImage(this.canvas, 0, 0);
 
-				// Clear the canvas area
+				// Clear the canvas
 				this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-				// Redraw all placed images
-				let imagesDrawn = 0;
-				for (const [imageKey, { img, position, size }] of this.placedImages.entries()) {
-					if (img && img.complete) {
-						try {
-							this.ctx.drawImage(img, position.x, position.y, size.width, size.height);
-							imagesDrawn++;
-						} catch (err) {
-							console.error("Error drawing image:", err);
-							// If the image failed to draw, try to reload it
-							const newImg = await this.reloadImage(imageKey);
-							if (newImg) {
-								this.placedImages.set(imageKey, {
-									img: newImg,
-									position,
-									size,
-								});
-								this.ctx.drawImage(newImg, position.x, position.y, size.width, size.height);
-								imagesDrawn++;
-							}
-						}
-					}
-				}
+				// Draw all images
+				this.placedImages.forEach(({ img, position, size }) => {
+					this.ctx.drawImage(img, position.x, position.y, size.width, size.height);
+				});
 
-				// console.log(`Successfully redrew ${imagesDrawn} images`);
-
-				// Restore the drawing history on top of the images
+				// Restore drawings from temp canvas using source-over compositing
+				this.ctx.globalCompositeOperation = "source-over";
 				this.ctx.drawImage(tempCanvas, 0, 0);
 
-				// Save state after redrawing
-				saveState();
+				// Reset compositing operation
+				this.ctx.globalCompositeOperation = "source-over";
 			} catch (error) {
-				console.error("Error during redraw:", error);
+				console.error("Error redrawing images:", error);
 			} finally {
 				this.isRedrawing = false;
 			}

@@ -78,8 +78,8 @@
           <button class="tool-btn" id="eraserBtn" data-tool="eraser" title="Eraser">
             <i class="fas fa-eraser"></i>
           </button>
-          <button style="display: none;" class="tool-btn" data-tool="image" title="Upload Image">
-            <i class="fas fa-image"></i>
+          <button id="imageUploadBtn" class="tool-btn" data-tool="image" title="Upload Image" ">
+            <i class=" fas fa-image"></i>
           </button>
         </div>
       </div>
@@ -228,14 +228,14 @@
     <!-- <input type="range" id="brushOpacity" min="0" max="100" value="100"> -->
   </div>
 
-  <div id="eraserSettings" class="eraser-settings" style="display: none;">
+  <div id="eraserSettings" class="brush-settings eraser-settings" style="display: none;">
     <h3>Eraser Settings</h3>
     <label for="eraserSize">Eraser Size:</label>
     <input type="range" id="eraserSize" min="5" max="70" value="30" class="size-slider">
     <!-- <div id="eraserSizeControl"></div> -->
   </div>
 
-  <div id="textSettings" class="text-settings" style="display: none;">
+  <div id="textSettings" class="text-settings brush-settings">
     <h3>Text Settings</h3>
     <label for="textColor">Text Color:</label>
     <input type="color" id="textColor" value="#000000">
@@ -245,35 +245,30 @@
   </div>
 
   <!-- NO NEED -->
-  <!-- <div id="lineSettings" class="tool-settings" style="display: none;">
+  <div id="lineSettings" class="tool-settings brush-settings">
     <h3>Line Settings</h3>
     <label for="lineColor">Line Color:</label>
     <input type="color" id="lineColor" value="#000000">
     <label for="lineSize">Line Size:</label>
     <input type="range" id="lineSize" min="1" max="20" value="2">
-    <label for="lineOpacity">Opacity:</label>
-    <input type="range" id="lineOpacity" min="0" max="100" value="100">
   </div>
 
-  <div id="rectangleSettings" class="tool-settings" style="display: none;">
+  <div id="rectangleSettings" class="tool-settings brush-settings">
     <h3>Rectangle Settings</h3>
     <label for="rectangleColor">Rectangle Color:</label>
     <input type="color" id="rectangleColor" value="#000000">
     <label for="rectangleSize">Line Size:</label>
     <input type="range" id="rectangleSize" min="1" max="20" value="2">
-    <label for="rectangleOpacity">Opacity:</label>
-    <input type="range" id="rectangleOpacity" min="0" max="100" value="100">
   </div>
 
-  <div id="circleSettings" class="tool-settings" style="display: none;">
+  <div id="circleSettings" class="tool-settings brush-settings">
     <h3>Circle Settings</h3>
     <label for="circleColor">Circle Color:</label>
     <input type="color" id="circleColor" value="#000000">
     <label for="circleSize">Line Size:</label>
     <input type="range" id="circleSize" min="1" max="20" value="2">
-    <label for="circleOpacity">Opacity:</label>
-    <input type="range" id="circleOpacity" min="0" max="100" value="100">
-  </div> -->
+
+  </div>
 
   <!-- Add eraser cursor element -->
   <div id="eraserCursor" style="
